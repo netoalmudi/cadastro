@@ -42,11 +42,15 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onEnd }) => {
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    let clientX, clientY;
+    let clientX = 0;
+    let clientY = 0;
 
     if ('touches' in event) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
+      const touch = event.touches[0];
+      if (touch) {
+        clientX = touch.clientX;
+        clientY = touch.clientY;
+      }
     } else {
       clientX = (event as React.MouseEvent).clientX;
       clientY = (event as React.MouseEvent).clientY;
@@ -62,11 +66,6 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onEnd }) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
     
-    // Prevent scrolling on touch devices
-    if ('touches' in event) {
-      // event.preventDefault(); // Sometimes causes issues with passive listeners, better handled by CSS touch-action
-    }
-
     const { x, y } = getCoordinates(event);
     ctx.beginPath();
     ctx.moveTo(x, y);
