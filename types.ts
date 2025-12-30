@@ -33,6 +33,7 @@ export interface ClientFormData {
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   className?: string;
+  error?: string;
 };
 
 export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & {

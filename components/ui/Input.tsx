@@ -1,7 +1,7 @@
 import React from 'react';
 import { InputProps } from '../../types';
 
-const Input: React.FC<InputProps> = ({ label, className, id, ...props }) => {
+const Input: React.FC<InputProps> = ({ label, className, id, error, ...props }) => {
   const inputId = id || label.toLowerCase().replace(/\s+/g, '-');
   
   return (
@@ -11,9 +11,16 @@ const Input: React.FC<InputProps> = ({ label, className, id, ...props }) => {
       </label>
       <input
         id={inputId}
-        className="border border-gray-300 rounded px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent placeholder-gray-400 bg-white"
+        className={`border rounded px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 placeholder-gray-400 bg-white transition-colors
+          ${error 
+            ? 'border-red-500 focus:border-red-500 focus:ring-red-200' 
+            : 'border-gray-300 focus:ring-primary focus:border-transparent'
+          }`}
         {...props}
       />
+      {error && (
+        <span className="text-xs text-red-500 mt-1">{error}</span>
+      )}
     </div>
   );
 };

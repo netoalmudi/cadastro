@@ -31,9 +31,157 @@ const ClientForm: React.FC = () => {
     assinatura: null as string | null,
   });
 
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [loadingAddress, setLoadingAddress] = useState(false);
+
+  const validateCPF = (cpf: string): boolean => {
+    // Remove non-digits
+    const cleanCPF = cpf.replace(/[^\d]/g, '');
+
+    // Regex to check if it has 11 digits and is not a sequence of same digits
+    // e.g., 111.111.111-11 is invalid
+    if (!/^\d{11}$/.test(cleanCPF) || /^(\d)\1+$/.test(cleanCPF)) {
+      return false;
+    }
+
+    // Checksum validation algorithm
+    let sum = 0;
+    let remainder;
+
+    // Validate first digit
+    for (let i = 1; i <= 9; i++) {
+      sum = sum + parseInt(cleanCPF.substring(i - 1, i)) * (11 - i);
+    }
+    remainder = (sum * 10) % 11;
+
+    if ((remainder === 10) || (remainder === 11)) remainder = 0;
+    if (remainder !== parseInt(cleanCPF.substring(9, 10))) return false;
+
+    // Validate second digit
+    sum = 0;
+    for (let i = 1; i <= 10; i++) {
+      sum = sum + parseInt(cleanCPF.substring(i - 1, i)) * (12 - i);
+    }
+    remainder = (sum * 10) % 11;
+
+    if ((remainder === 10) || (remainder === 11)) remainder = 0;
+    if (remainder !== parseInt(cleanCPF.substring(10, 11))) return false;
+
+    return true;
+  };
+
+  const formatCPF = (value: string) => {
+    return value
+      .replace(/\D/g, '') // Replace non-digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1'); // Limit to 11 digits formatted
+  };
+
+  const formatPhone = (value: string) => {
+    const cleanValue = value.replace(/\D/g, '').substring(0, 11);
+    return cleanValue
+      .replace(/^(\d{2})(\d)/g, '($1) $2') // (XX) X...
+      .replace(/(\d)(\d{4})$/, '$1-$2'); // ...X-XXXX
+  };
+
+  const formatCEP = (value: string) => {
+    return value
+      .replace(/\D/g, '')
+      .replace(/^(\d{5})(\d)/, '$1-$2')
+      .slice(0, 9);
+  };
+
+  const fetchAddressByCEP = async (cep: string) => {
+    const cleanCEP = cep.replace(/\D/g, '');
+    if (cleanCEP.length !== 8) return;
+
+    setLoadingAddress(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+      const data = await response.json();
+
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          endereco: data.logradouro,
+          bairro: data.bairro,
+          cidade: data.localidade,
+          estado: data.uf,
+          pais: 'Brasil'
+        }));
+        setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.cep;
+            return newErrors;
+        });
+      } else {
+        setErrors(prev => ({ ...prev, cep: 'CEP não encontrado.' }));
+      }
+    } catch (error) {
+      console.error("Erro ao buscar CEP:", error);
+      setErrors(prev => ({ ...prev, cep: 'Erro ao buscar CEP.' }));
+    } finally {
+        setLoadingAddress(false);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    let newValue = value;
+
+    // Apply mask to CPF
+    if (name === 'cpf') {
+      newValue = formatCPF(value);
+      // Clear error while typing if validation was previously failed
+      if (errors.cpf) {
+        setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.cpf;
+            return newErrors;
+        });
+      }
+    }
+
+    // Apply mask to Celular
+    if (name === 'celular') {
+      newValue = formatPhone(value);
+    }
+
+    // Apply mask to CEP
+    if (name === 'cep') {
+      newValue = formatCEP(value);
+      if (errors.cep) {
+        setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.cep;
+            return newErrors;
+        });
+      }
+    }
+
+    setFormData(prev => ({ ...prev, [name]: newValue }));
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    if (name === 'cpf') {
+      if (value && !validateCPF(value)) {
+        setErrors(prev => ({ ...prev, cpf: 'CPF inválido.' }));
+      } else {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.cpf;
+          return newErrors;
+        });
+      }
+    }
+
+    if (name === 'cep') {
+        fetchAddressByCEP(value);
+    }
   };
 
   const handleSignature = (sig: string | null) => {
@@ -42,6 +190,14 @@ const ClientForm: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Final validation check before submit
+    if (formData.cpf && !validateCPF(formData.cpf)) {
+        setErrors(prev => ({ ...prev, cpf: 'CPF inválido.' }));
+        alert("Por favor, corrija o CPF antes de continuar.");
+        return;
+    }
+
     console.log("Form Submitted:", formData);
     alert("Dados salvos com sucesso! Verifique o console para detalhes.");
   };
@@ -109,7 +265,10 @@ const ClientForm: React.FC = () => {
             placeholder="000.000.000-00" 
             value={formData.cpf} 
             onChange={handleChange}
+            onBlur={handleBlur}
+            error={errors.cpf}
             required
+            maxLength={14}
             className="md:col-span-1"
           />
           <Input 
@@ -147,7 +306,11 @@ const ClientForm: React.FC = () => {
             placeholder="00000-000" 
             value={formData.cep} 
             onChange={handleChange}
+            onBlur={handleBlur}
+            error={errors.cep}
+            maxLength={9}
             className="md:col-span-1"
+            disabled={loadingAddress}
           />
           <Input 
             label="Endereço" 
@@ -207,6 +370,7 @@ const ClientForm: React.FC = () => {
             value={formData.celular} 
             onChange={handleChange}
             required
+            maxLength={15}
             className="md:col-span-1"
           />
           <Input 
