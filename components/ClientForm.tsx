@@ -5,10 +5,49 @@ import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
 import { Camera, Upload } from 'lucide-react';
 
+// Interface para o estado do formulário
+interface ClientFormState {
+  nome: string;
+  sobrenome: string;
+  dataNascimento: string;
+  sexo: string;
+  cpf: string;
+  rg: string;
+  ufRg: string;
+  passaporte: string;
+  cep: string;
+  endereco: string;
+  numero: string;
+  bairro: string;
+  complemento: string;
+  cidade: string;
+  estado: string;
+  pais: string;
+  celular: string;
+  email: string;
+  observacoes: string;
+  assinatura: string | null;
+}
+
+// Interface para resposta do ViaCEP
+interface ViaCepResponse {
+  cep: string;
+  logradouro: string;
+  complemento: string;
+  bairro: string;
+  localidade: string;
+  uf: string;
+  ibge: string;
+  gia: string;
+  ddd: string;
+  siafi: string;
+  erro?: boolean;
+}
+
 const ClientForm: React.FC = () => {
   const protocolNumber = "202512-7434"; // Mock protocol
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ClientFormState>({
     nome: '',
     sobrenome: '',
     dataNascimento: '',
@@ -28,7 +67,7 @@ const ClientForm: React.FC = () => {
     celular: '',
     email: '',
     observacoes: '',
-    assinatura: null as string | null,
+    assinatura: null,
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -39,7 +78,6 @@ const ClientForm: React.FC = () => {
     const cleanCPF = cpf.replace(/[^\d]/g, '');
 
     // Regex to check if it has 11 digits and is not a sequence of same digits
-    // e.g., 111.111.111-11 is invalid
     if (!/^\d{11}$/.test(cleanCPF) || /^(\d)\1+$/.test(cleanCPF)) {
       return false;
     }
@@ -100,7 +138,7 @@ const ClientForm: React.FC = () => {
     setLoadingAddress(true);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
-      const data = await response.json();
+      const data = await response.json() as ViaCepResponse;
 
       if (!data.erro) {
         setFormData(prev => ({
@@ -189,7 +227,8 @@ const ClientForm: React.FC = () => {
       }
     }
 
-    setFormData(prev => ({ ...prev, [name]: newValue }));
+    // Use type assertion to tell TypeScript that `name` is a valid key
+    setFormData(prev => ({ ...prev, [name as keyof ClientFormState]: newValue }));
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {

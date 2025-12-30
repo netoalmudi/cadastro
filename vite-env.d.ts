@@ -1,2 +1,3 @@
-// Fix: Comment out the reference to vite/client to resolve the missing type definition error.
+// Fixed: "Cannot find type definition file for 'vite/client'"
+// The reference is commented out to resolve the build error as the type definition is missing.
 // /// <reference types="vite/client" />
