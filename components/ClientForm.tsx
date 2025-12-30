@@ -303,13 +303,21 @@ const ClientForm: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white shadow-sm sm:rounded-lg border border-gray-100 mt-6 mb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b-2 border-primary pb-4 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-2 sm:mb-0">
-          Cadastro de Clientes
-        </h1>
-        <div className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200">
+      <div className="flex flex-col md:flex-row justify-between items-center border-b-2 border-primary pb-6 mb-8 gap-4">
+        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+            <img 
+              src="https://raw.githubusercontent.com/oa-79/b95079a4-a151-4f10-b5ef-770c87d603a1/image.png" 
+              alt="Neto Almudi Viagens" 
+              className="h-28 w-auto object-contain transition-transform hover:scale-105"
+            />
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center md:text-left">
+              Cadastro de Clientes
+            </h1>
+        </div>
+        
+        <div className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200 shadow-sm">
           <span className="font-bold text-gray-800">Protocolo: </span>
-          <span className="font-mono text-gray-700">{protocolNumber}</span>
+          <span className="font-mono text-primary font-medium">{protocolNumber}</span>
         </div>
       </div>
 
