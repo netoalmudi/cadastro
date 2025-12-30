@@ -14,7 +14,7 @@ const Select: React.FC<SelectProps> = ({ label, options, className, id, ...props
         className="border border-gray-300 rounded px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white h-[42px]"
         {...props}
       >
-        <option value="" disabled selected>Select...</option>
+        <option value="" disabled>Selecione</option>
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}

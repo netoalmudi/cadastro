@@ -118,10 +118,26 @@ const ClientForm: React.FC = () => {
         });
       } else {
         setErrors(prev => ({ ...prev, cep: 'CEP não encontrado.' }));
+        // Clear fields on error
+        setFormData(prev => ({
+          ...prev,
+          endereco: '',
+          bairro: '',
+          cidade: '',
+          estado: ''
+        }));
       }
     } catch (error) {
       console.error("Erro ao buscar CEP:", error);
       setErrors(prev => ({ ...prev, cep: 'Erro ao buscar CEP.' }));
+      // Clear fields on error
+      setFormData(prev => ({
+          ...prev,
+          endereco: '',
+          bairro: '',
+          cidade: '',
+          estado: ''
+      }));
     } finally {
         setLoadingAddress(false);
     }
@@ -158,6 +174,18 @@ const ClientForm: React.FC = () => {
             delete newErrors.cep;
             return newErrors;
         });
+      }
+      // Clear fields if CEP is cleared
+      if (newValue === '') {
+        setFormData(prev => ({
+            ...prev,
+            [name]: newValue,
+            endereco: '',
+            bairro: '',
+            cidade: '',
+            estado: ''
+        }));
+        return;
       }
     }
 
