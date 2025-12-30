@@ -188,14 +188,6 @@ const ClientForm: React.FC = () => {
     // Apply mask to CPF
     if (name === 'cpf') {
       newValue = formatCPF(value);
-      // Clear error while typing if validation was previously failed
-      if (errors.cpf) {
-        setErrors(prev => {
-            const newErrors = { ...prev };
-            delete newErrors.cpf;
-            return newErrors;
-        });
-      }
     }
 
     // Apply mask to Celular
@@ -206,13 +198,6 @@ const ClientForm: React.FC = () => {
     // Apply mask to CEP
     if (name === 'cep') {
       newValue = formatCEP(value);
-      if (errors.cep) {
-        setErrors(prev => {
-            const newErrors = { ...prev };
-            delete newErrors.cep;
-            return newErrors;
-        });
-      }
       // Clear fields if CEP is cleared
       if (newValue === '') {
         setFormData(prev => ({
@@ -223,8 +208,23 @@ const ClientForm: React.FC = () => {
             cidade: '',
             estado: ''
         }));
+        // Also clear error immediately if cleared
+        setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.cep;
+            return newErrors;
+        });
         return;
       }
+    }
+
+    // Generic error clearing: if the user types in a field that has an error, clear that error
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
     }
 
     // Use type assertion to tell TypeScript that `name` is a valid key
@@ -237,13 +237,9 @@ const ClientForm: React.FC = () => {
     if (name === 'cpf') {
       if (value && !validateCPF(value)) {
         setErrors(prev => ({ ...prev, cpf: 'CPF inválido.' }));
-      } else {
-        setErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors.cpf;
-          return newErrors;
-        });
       }
+      // Note: we don't clear error here on success because handleChange already clears it when typing, 
+      // and we want to keep it clear.
     }
 
     if (name === 'cep') {
@@ -258,11 +254,46 @@ const ClientForm: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Final validation check before submit
-    if (formData.cpf && !validateCPF(formData.cpf)) {
-        setErrors(prev => ({ ...prev, cpf: 'CPF inválido.' }));
-        alert("Por favor, corrija o CPF antes de continuar.");
-        return;
+    const newErrors: { [key: string]: string } = {};
+    let isValid = true;
+
+    // Validate Required Fields
+    if (!formData.cpf) {
+      newErrors.cpf = 'CPF é obrigatório.';
+      isValid = false;
+    } else if (!validateCPF(formData.cpf)) {
+      newErrors.cpf = 'CPF inválido.';
+      isValid = false;
+    }
+
+    if (!formData.celular) {
+      newErrors.celular = 'Celular é obrigatório.';
+      isValid = false;
+    } else if (formData.celular.length < 14) { // Simple length check for (XX) XXXXX-XXXX
+        newErrors.celular = 'Celular incompleto.';
+        isValid = false;
+    }
+
+    if (!formData.email) {
+      newErrors.email = 'E-mail é obrigatório.';
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        newErrors.email = 'E-mail inválido.';
+        isValid = false;
+    }
+
+    if (!isValid) {
+      setErrors(prev => ({ ...prev, ...newErrors }));
+      
+      // Find the first error field to scroll to (optional user experience enhancement)
+      const firstErrorField = Object.keys(newErrors)[0];
+      const element = document.getElementsByName(firstErrorField)[0];
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.focus();
+      }
+      
+      return;
     }
 
     console.log("Form Submitted:", formData);
@@ -282,7 +313,7 @@ const ClientForm: React.FC = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         
         {/* IDENTIFICAÇÃO */}
         <SectionHeader title="Identificação" />
@@ -436,6 +467,7 @@ const ClientForm: React.FC = () => {
             placeholder="(00) 00000-0000" 
             value={formData.celular} 
             onChange={handleChange}
+            error={errors.celular}
             required
             maxLength={15}
             className="md:col-span-1"
@@ -447,6 +479,7 @@ const ClientForm: React.FC = () => {
             placeholder="cliente@email.com" 
             value={formData.email} 
             onChange={handleChange}
+            error={errors.email}
             required
             className="md:col-span-2"
           />
