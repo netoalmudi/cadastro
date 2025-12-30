@@ -3,7 +3,7 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload } from 'lucide-react';
+import { Camera, Upload, ImageOff } from 'lucide-react';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -47,6 +47,25 @@ interface ViaCepResponse {
 const ClientForm: React.FC = () => {
   const protocolNumber = "202512-7434"; // Mock protocol
   
+  // Safe resolution of logo URL to prevent crashes in environments where import.meta.url is problematic
+  const getLogoUrl = () => {
+    try {
+      // Try to construct URL relative to current module
+      if (typeof import.meta !== 'undefined' && import.meta.url) {
+        return new URL('./image.png', import.meta.url).href;
+      }
+      // Fallback if import.meta is missing
+      return 'https://raw.githubusercontent.com/oa-79/b95079a4-a151-4f10-b5ef-770c87d603a1/image.png';
+    } catch (e) {
+      // Fallback on any error (like Invalid URL)
+      console.warn('Could not resolve local logo path:', e);
+      return 'https://raw.githubusercontent.com/oa-79/b95079a4-a151-4f10-b5ef-770c87d603a1/image.png';
+    }
+  };
+
+  const logoUrl = getLogoUrl();
+  const [imageError, setImageError] = useState(false);
+
   const [formData, setFormData] = useState<ClientFormState>({
     nome: '',
     sobrenome: '',
@@ -305,14 +324,26 @@ const ClientForm: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center border-b-2 border-primary pb-6 mb-8 gap-4">
         <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-            <img 
-              src="https://raw.githubusercontent.com/oa-79/b95079a4-a151-4f10-b5ef-770c87d603a1/image.png" 
-              alt="Neto Almudi Viagens" 
-              className="h-28 w-auto object-contain transition-transform hover:scale-105"
-            />
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center md:text-left">
-              Cadastro de Clientes
-            </h1>
+            {!imageError ? (
+              <img 
+                src={logoUrl} 
+                alt="Neto Almudi Viagens" 
+                className="h-28 w-auto object-contain transition-transform hover:scale-105"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="flex items-center gap-2 text-primary">
+                 <ImageOff className="w-10 h-10 opacity-50" />
+                 <h1 className="text-2xl sm:text-3xl font-bold text-center md:text-left">
+                    Neto Almudi Viagens
+                 </h1>
+              </div>
+            )}
+            {!imageError && (
+              <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center md:text-left">
+                Cadastro de Clientes
+              </h1>
+            )}
         </div>
         
         <div className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200 shadow-sm">
