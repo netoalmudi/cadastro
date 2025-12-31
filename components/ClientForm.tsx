@@ -45,7 +45,14 @@ interface ViaCepResponse {
 }
 
 const ClientForm: React.FC = () => {
-  const protocolNumber = "202512-7434"; // Mock protocol
+  // Gera o protocolo: YYYYMM-XXXX (4 dígitos aleatórios)
+  const [protocolNumber] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0'); // Mês começa em 0
+    const random = Math.floor(1000 + Math.random() * 9000); // Garante 4 dígitos (1000-9999)
+    return `${year}${month}-${random}`;
+  });
   
   const [formData, setFormData] = useState<ClientFormState>({
     nome: '',
