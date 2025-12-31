@@ -58,8 +58,11 @@ const ClientForm: React.FC = () => {
     const random = Math.floor(1000 + Math.random() * 9000); // Garante 4 dígitos (1000-9999)
     return `${year}${month}-${random}`;
   });
+
+  // Estado para controlar a re-renderização do SignaturePad ao limpar
+  const [signatureKey, setSignatureKey] = useState(0);
   
-  const [formData, setFormData] = useState<ClientFormState>({
+  const initialFormData: ClientFormState = {
     nome: '',
     sobrenome: '',
     dataNascimento: '',
@@ -82,7 +85,9 @@ const ClientForm: React.FC = () => {
     assinatura: null,
     arquivoRg: null,
     arquivoPassaporte: null,
-  });
+  };
+
+  const [formData, setFormData] = useState<ClientFormState>(initialFormData);
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [loadingAddress, setLoadingAddress] = useState(false);
@@ -245,6 +250,11 @@ const ClientForm: React.FC = () => {
       newValue = formatDate(value);
     }
 
+    // Force Uppercase for UF RG, Nome, Sobrenome, Passaporte
+    if (['ufRg', 'nome', 'sobrenome', 'passaporte'].includes(name)) {
+      newValue = value.toUpperCase();
+    }
+
     // Generic error clearing: if the user types in a field that has an error, clear that error
     if (errors[name]) {
       setErrors(prev => {
@@ -290,6 +300,15 @@ const ClientForm: React.FC = () => {
 
   const handleSignature = (sig: string | null) => {
     setFormData(prev => ({ ...prev, assinatura: sig }));
+  };
+
+  const handleClear = () => {
+    if (window.confirm("Tem certeza que deseja limpar todos os campos do formulário?")) {
+      setFormData(initialFormData);
+      setErrors({});
+      setSignatureKey(prev => prev + 1); // Força recriação do componente de assinatura
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -601,10 +620,17 @@ const ClientForm: React.FC = () => {
         <SectionHeader title="Assinatura Digital" />
         
         <div className="mb-8">
-           <SignaturePad onEnd={handleSignature} />
+           <SignaturePad key={signatureKey} onEnd={handleSignature} />
         </div>
 
-        <div className="flex justify-end pt-6 border-t border-gray-200">
+        <div className="flex justify-end pt-6 border-t border-gray-200 gap-4">
+            <button
+              type="button"
+              onClick={handleClear}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200"
+            >
+              Limpar
+            </button>
             <button
               type="submit"
               className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5"
