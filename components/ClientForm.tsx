@@ -5,6 +5,7 @@ import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
 import { Camera, Upload, CheckCircle, Loader2 } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
+import { supabase } from '../db/database';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -258,7 +259,29 @@ const ClientForm: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Função auxiliar para upload de arquivos
+  const uploadFile = async (file: File, folder: string) => {
+    const fileExt = file.name.split('.').pop();
+    // Nome único para evitar sobrescrita
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `${folder}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('documentos-clientes') // Nome do bucket criado no passo anterior
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from('documentos-clientes')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const newErrors: { [key: string]: string } = {};
@@ -287,28 +310,61 @@ const ClientForm: React.FC = () => {
 
     setIsSubmitting(true);
 
-    // SIMULAÇÃO DE ENVIO
-    setTimeout(() => {
-      console.log("=== DADOS DO FORMULÁRIO (SIMULAÇÃO) ===");
-      console.log(formData);
-      console.log("Arquivos prontos para upload (tamanho final):", {
-        rg: { 
-          name: formData.arquivoRg?.name, 
-          size: formData.arquivoRg?.size,
-          type: formData.arquivoRg?.type
-        },
-        passaporte: {
-          name: formData.arquivoPassaporte?.name,
-          size: formData.arquivoPassaporte?.size,
-          type: formData.arquivoPassaporte?.type
-        }
-      });
-      
-      alert(`Cadastro simulado com sucesso! Protocolo: ${protocolNumber}\n\n(Nenhum dado foi salvo no banco de dados)`);
-      
+    try {
+      // 1. Upload das Imagens (se existirem)
+      let rgUrl = null;
+      let passaporteUrl = null;
+
+      if (formData.arquivoRg) {
+         rgUrl = await uploadFile(formData.arquivoRg, 'rg');
+      }
+      if (formData.arquivoPassaporte) {
+         passaporteUrl = await uploadFile(formData.arquivoPassaporte, 'passaporte');
+      }
+
+      // 2. Inserção no Banco de Dados
+      // Mapeando do estado (camelCase) para o banco (snake_case) conforme tabela criada
+      const { error: insertError } = await supabase
+        .from('clientes')
+        .insert([
+          {
+            protocolo: protocolNumber,
+            nome: formData.nome,
+            sobrenome: formData.sobrenome,
+            data_nascimento: formData.dataNascimento,
+            sexo: formData.sexo,
+            cpf: formData.cpf,
+            rg: formData.rg,
+            uf_rg: formData.ufRg,
+            passaporte: formData.passaporte,
+            cep: formData.cep,
+            endereco: formData.endereco,
+            numero: formData.numero,
+            bairro: formData.bairro,
+            complemento: formData.complemento,
+            cidade: formData.cidade,
+            estado: formData.estado,
+            pais: formData.pais,
+            celular: formData.celular,
+            email: formData.email,
+            observacoes: formData.observacoes,
+            assinatura: formData.assinatura,
+            rg_url: rgUrl,
+            passaporte_url: passaporteUrl
+          }
+        ]);
+
+      if (insertError) throw insertError;
+
+      alert(`Cadastro realizado com sucesso! Protocolo: ${protocolNumber}`);
       resetForm();
+
+    } catch (error: any) {
+      console.error("Erro ao enviar formulário:", error);
+      alert('Erro ao realizar cadastro: ' + (error.message || 'Ocorreu um erro inesperado.'));
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -433,7 +489,7 @@ const ClientForm: React.FC = () => {
               Limpar
             </button>
             <button type="submit" className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting || !!processingFile}>
-              {isSubmitting ? 'Enviando (Simulado)...' : 'Enviar'}
+              {isSubmitting ? 'Enviando...' : 'Enviar'}
             </button>
         </div>
 
