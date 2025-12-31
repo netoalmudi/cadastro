@@ -361,7 +361,13 @@ const ClientForm: React.FC = () => {
     if (formData.arquivoRg) console.log("Arquivo RG:", formData.arquivoRg.name);
     if (formData.arquivoPassaporte) console.log("Arquivo Passaporte:", formData.arquivoPassaporte.name);
     
-    alert("Dados salvos com sucesso! Verifique o console para detalhes.");
+    // Simula o salvamento e limpa o formulário
+    alert("Cadastro realizado com sucesso!");
+    
+    setFormData(initialFormData);
+    setErrors({});
+    setSignatureKey(prev => prev + 1); // Força recriação do componente de assinatura
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
