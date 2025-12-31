@@ -1,12 +1,10 @@
 /// <reference types="vite/client" />
 
-export {};
+interface ImportMetaEnv {
+  readonly API_KEY: string;
+  [key: string]: any;
+}
 
-declare global {
-  namespace NodeJS {
-    interface ProcessEnv {
-      readonly API_KEY: string;
-      [key: string]: string | undefined;
-    }
-  }
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }
