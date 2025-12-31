@@ -527,7 +527,10 @@ const ClientForm: React.FC = () => {
         <SectionHeader title="Documentos" />
 
         <div className="flex flex-col sm:flex-row gap-4">
-          <label className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed ${formData.arquivoRg ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700'} rounded hover:bg-opacity-80 cursor-pointer transition w-full sm:w-auto`}>
+          <label 
+            htmlFor="arquivoRg"
+            className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed ${formData.arquivoRg ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700'} rounded hover:bg-opacity-80 cursor-pointer transition w-full sm:w-auto`}
+          >
             {formData.arquivoRg ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Camera className="w-5 h-5 text-blue-500" />}
             <div className="flex flex-col items-center sm:items-start">
               <span className="text-sm font-medium">
@@ -536,14 +539,19 @@ const ClientForm: React.FC = () => {
               {formData.arquivoRg && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>}
             </div>
             <input 
+              id="arquivoRg"
               type="file" 
-              className="hidden" 
+              className="sr-only" 
               accept="image/*" 
               onChange={(e) => handleFileChange(e, 'arquivoRg')}
+              onClick={(e) => (e.target as HTMLInputElement).value = ''}
             />
           </label>
 
-          <label className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed ${formData.arquivoPassaporte ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700'} rounded hover:bg-opacity-80 cursor-pointer transition w-full sm:w-auto`}>
+          <label 
+            htmlFor="arquivoPassaporte"
+            className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed ${formData.arquivoPassaporte ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700'} rounded hover:bg-opacity-80 cursor-pointer transition w-full sm:w-auto`}
+          >
             {formData.arquivoPassaporte ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Upload className="w-5 h-5 text-blue-500" />}
             <div className="flex flex-col items-center sm:items-start">
                <span className="text-sm font-medium">
@@ -552,10 +560,12 @@ const ClientForm: React.FC = () => {
                {formData.arquivoPassaporte && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>}
             </div>
             <input 
+              id="arquivoPassaporte"
               type="file" 
-              className="hidden" 
+              className="sr-only" 
               accept="image/*"
               onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} 
+              onClick={(e) => (e.target as HTMLInputElement).value = ''}
             />
           </label>
         </div>
