@@ -1,3 +1,3 @@
-// Arquivo placeholder.
-// A configuração do banco de dados foi removida para garantir um estado puramente frontend.
-export const db = {};
+// Arquivo esvaziado intencionalmente.
+// Nenhuma configuração de banco de dados está ativa no momento.
+export {};
