@@ -3,7 +3,7 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload } from 'lucide-react';
+import { Camera, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -27,6 +27,9 @@ interface ClientFormState {
   email: string;
   observacoes: string;
   assinatura: string | null;
+  // Campos de arquivo
+  arquivoRg: File | null;
+  arquivoPassaporte: File | null;
 }
 
 // Interface para resposta do ViaCEP
@@ -43,6 +46,8 @@ interface ViaCepResponse {
   siafi: string;
   erro?: boolean;
 }
+
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB em bytes
 
 const ClientForm: React.FC = () => {
   // Gera o protocolo: YYYYMM-XXXX (4 dígitos aleatórios)
@@ -75,6 +80,8 @@ const ClientForm: React.FC = () => {
     email: '',
     observacoes: '',
     assinatura: null,
+    arquivoRg: null,
+    arquivoPassaporte: null,
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -254,6 +261,20 @@ const ClientForm: React.FC = () => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'arquivoRg' | 'arquivoPassaporte') => {
+    const file = e.target.files?.[0];
+    
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        alert("O arquivo selecionado excede o tamanho máximo permitido de 2MB.");
+        e.target.value = ''; // Limpa o input
+        return;
+      }
+      
+      setFormData(prev => ({ ...prev, [fieldName]: file }));
+    }
+  };
+
   const handleSignature = (sig: string | null) => {
     setFormData(prev => ({ ...prev, assinatura: sig }));
   };
@@ -304,6 +325,10 @@ const ClientForm: React.FC = () => {
     }
 
     console.log("Form Submitted:", formData);
+    // Para verificação do arquivo no log
+    if (formData.arquivoRg) console.log("Arquivo RG:", formData.arquivoRg.name);
+    if (formData.arquivoPassaporte) console.log("Arquivo Passaporte:", formData.arquivoPassaporte.name);
+    
     alert("Dados salvos com sucesso! Verifique o console para detalhes.");
   };
 
@@ -502,16 +527,38 @@ const ClientForm: React.FC = () => {
         <SectionHeader title="Documentos" />
 
         <div className="flex flex-col sm:flex-row gap-4">
-          <label className="flex items-center justify-center gap-2 px-6 py-4 border border-gray-300 rounded bg-gray-50 text-gray-600 hover:bg-gray-100 cursor-pointer transition w-full sm:w-auto">
-            <Camera className="w-5 h-5 text-gray-500" />
-            <span className="text-sm font-medium">Foto RG/CPF/CNH (Máx 2MB)</span>
-            <input type="file" className="hidden" accept="image/*" />
+          <label className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed ${formData.arquivoRg ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700'} rounded hover:bg-opacity-80 cursor-pointer transition w-full sm:w-auto`}>
+            {formData.arquivoRg ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Camera className="w-5 h-5 text-blue-500" />}
+            <div className="flex flex-col items-center sm:items-start">
+              <span className="text-sm font-medium">
+                {formData.arquivoRg ? 'Arquivo RG Selecionado' : 'Foto RG/CPF/CNH (Máx 2MB)'}
+              </span>
+              {formData.arquivoRg && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>}
+            </div>
+            <input 
+              type="file" 
+              className="hidden" 
+              accept="image/*" 
+              capture="environment"
+              onChange={(e) => handleFileChange(e, 'arquivoRg')}
+            />
           </label>
 
-          <label className="flex items-center justify-center gap-2 px-6 py-4 border border-dashed border-blue-300 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer transition w-full sm:w-auto">
-            <Upload className="w-5 h-5 text-blue-500" />
-            <span className="text-sm font-medium">Foto Passaporte (Máx 2MB)</span>
-            <input type="file" className="hidden" accept="image/*" />
+          <label className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed ${formData.arquivoPassaporte ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700'} rounded hover:bg-opacity-80 cursor-pointer transition w-full sm:w-auto`}>
+            {formData.arquivoPassaporte ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Upload className="w-5 h-5 text-blue-500" />}
+            <div className="flex flex-col items-center sm:items-start">
+               <span className="text-sm font-medium">
+                 {formData.arquivoPassaporte ? 'Arquivo Passaporte Selecionado' : 'Foto Passaporte (Máx 2MB)'}
+               </span>
+               {formData.arquivoPassaporte && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>}
+            </div>
+            <input 
+              type="file" 
+              className="hidden" 
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} 
+            />
           </label>
         </div>
 
