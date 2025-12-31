@@ -3,9 +3,7 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { db } from '../db/database';
-import { compressImage } from '../utils/imageUtils';
+import { Camera, Upload, CheckCircle } from 'lucide-react';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -29,7 +27,7 @@ interface ClientFormState {
   email: string;
   observacoes: string;
   assinatura: string | null;
-  // Campos de arquivo
+  // Campos de arquivo (apenas armazenados no estado local por enquanto)
   arquivoRg: File | null;
   arquivoPassaporte: File | null;
 }
@@ -50,7 +48,7 @@ interface ViaCepResponse {
 }
 
 const ClientForm: React.FC = () => {
-  // Gera o protocolo: YYYYMM-XXXX (4 dígitos aleatórios)
+  // Gera o protocolo visualmente: YYYYMM-XXXX
   const generateProtocol = () => {
     const now = new Date();
     const year = now.getFullYear();
@@ -65,9 +63,6 @@ const ClientForm: React.FC = () => {
   const [signatureKey, setSignatureKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Estado para controlar quais campos de arquivo estão sendo comprimidos
-  const [compressingFields, setCompressingFields] = useState<{ [key: string]: boolean }>({});
-
   const initialFormData: ClientFormState = {
     nome: '',
     sobrenome: '',
@@ -94,39 +89,26 @@ const ClientForm: React.FC = () => {
   };
 
   const [formData, setFormData] = useState<ClientFormState>(initialFormData);
-
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [loadingAddress, setLoadingAddress] = useState(false);
 
+  // --- Validações e Formatações ---
+
   const validateCPF = (cpf: string): boolean => {
-    // Remove non-digits
     const cleanCPF = cpf.replace(/[^\d]/g, '');
+    if (!/^\d{11}$/.test(cleanCPF) || /^(\d)\1+$/.test(cleanCPF)) return false;
 
-    // Regex to check if it has 11 digits and is not a sequence of same digits
-    if (!/^\d{11}$/.test(cleanCPF) || /^(\d)\1+$/.test(cleanCPF)) {
-      return false;
-    }
-
-    // Checksum validation algorithm
     let sum = 0;
     let remainder;
 
-    // Validate first digit
-    for (let i = 1; i <= 9; i++) {
-      sum = sum + parseInt(cleanCPF.substring(i - 1, i)) * (11 - i);
-    }
+    for (let i = 1; i <= 9; i++) sum = sum + parseInt(cleanCPF.substring(i - 1, i)) * (11 - i);
     remainder = (sum * 10) % 11;
-
     if ((remainder === 10) || (remainder === 11)) remainder = 0;
     if (remainder !== parseInt(cleanCPF.substring(9, 10))) return false;
 
-    // Validate second digit
     sum = 0;
-    for (let i = 1; i <= 10; i++) {
-      sum = sum + parseInt(cleanCPF.substring(i - 1, i)) * (12 - i);
-    }
+    for (let i = 1; i <= 10; i++) sum = sum + parseInt(cleanCPF.substring(i - 1, i)) * (12 - i);
     remainder = (sum * 10) % 11;
-
     if ((remainder === 10) || (remainder === 11)) remainder = 0;
     if (remainder !== parseInt(cleanCPF.substring(10, 11))) return false;
 
@@ -135,18 +117,18 @@ const ClientForm: React.FC = () => {
 
   const formatCPF = (value: string) => {
     return value
-      .replace(/\D/g, '') // Replace non-digits
+      .replace(/\D/g, '')
       .replace(/(\d{3})(\d)/, '$1.$2')
       .replace(/(\d{3})(\d)/, '$1.$2')
       .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1'); // Limit to 11 digits formatted
+      .replace(/(-\d{2})\d+?$/, '$1');
   };
 
   const formatPhone = (value: string) => {
     const cleanValue = value.replace(/\D/g, '').substring(0, 11);
     return cleanValue
-      .replace(/^(\d{2})(\d)/g, '($1) $2') // (XX) X...
-      .replace(/(\d)(\d{4})$/, '$1-$2'); // ...X-XXXX
+      .replace(/^(\d{2})(\d)/g, '($1) $2')
+      .replace(/(\d)(\d{4})$/, '$1-$2');
   };
 
   const formatCEP = (value: string) => {
@@ -158,11 +140,13 @@ const ClientForm: React.FC = () => {
 
   const formatDate = (value: string) => {
     return value
-      .replace(/\D/g, '') // Remove tudo que não é dígito
-      .replace(/(\d{2})(\d)/, '$1/$2') // Adiciona barra após o dia
-      .replace(/(\d{2})(\d)/, '$1/$2') // Adiciona barra após o mês
-      .replace(/(\d{4})\d+?$/, '$1'); // Limita o ano a 4 dígitos
+      .replace(/\D/g, '')
+      .replace(/(\d{2})(\d)/, '$1/$2')
+      .replace(/(\d{2})(\d)/, '$1/$2')
+      .replace(/(\d{4})\d+?$/, '$1');
   };
+
+  // --- Handlers ---
 
   const fetchAddressByCEP = async (cep: string) => {
     const cleanCEP = cep.replace(/\D/g, '');
@@ -189,26 +173,11 @@ const ClientForm: React.FC = () => {
         });
       } else {
         setErrors(prev => ({ ...prev, cep: 'CEP não encontrado.' }));
-        // Clear fields on error
-        setFormData(prev => ({
-          ...prev,
-          endereco: '',
-          bairro: '',
-          cidade: '',
-          estado: ''
-        }));
+        setFormData(prev => ({ ...prev, endereco: '', bairro: '', cidade: '', estado: '' }));
       }
     } catch (error) {
       console.error("Erro ao buscar CEP:", error);
       setErrors(prev => ({ ...prev, cep: 'Erro ao buscar CEP.' }));
-      // Clear fields on error
-      setFormData(prev => ({
-          ...prev,
-          endereco: '',
-          bairro: '',
-          cidade: '',
-          estado: ''
-      }));
     } finally {
         setLoadingAddress(false);
     }
@@ -218,50 +187,18 @@ const ClientForm: React.FC = () => {
     const { name, value } = e.target;
     let newValue = value;
 
-    // Apply mask to CPF
-    if (name === 'cpf') {
-      newValue = formatCPF(value);
-    }
-
-    // Apply mask to Celular
-    if (name === 'celular') {
-      newValue = formatPhone(value);
-    }
-
-    // Apply mask to CEP
+    if (name === 'cpf') newValue = formatCPF(value);
+    if (name === 'celular') newValue = formatPhone(value);
     if (name === 'cep') {
       newValue = formatCEP(value);
-      // Clear fields if CEP is cleared
       if (newValue === '') {
-        setFormData(prev => ({
-            ...prev,
-            [name]: newValue,
-            endereco: '',
-            bairro: '',
-            cidade: '',
-            estado: ''
-        }));
-        // Also clear error immediately if cleared
-        setErrors(prev => {
-            const newErrors = { ...prev };
-            delete newErrors.cep;
-            return newErrors;
-        });
+        setFormData(prev => ({ ...prev, [name]: newValue, endereco: '', bairro: '', cidade: '', estado: '' }));
         return;
       }
     }
+    if (name === 'dataNascimento') newValue = formatDate(value);
+    if (['ufRg', 'nome', 'sobrenome', 'passaporte'].includes(name)) newValue = value.toUpperCase();
 
-    // Apply mask to Data Nascimento
-    if (name === 'dataNascimento') {
-      newValue = formatDate(value);
-    }
-
-    // Force Uppercase for UF RG, Nome, Sobrenome, Passaporte
-    if (['ufRg', 'nome', 'sobrenome', 'passaporte'].includes(name)) {
-      newValue = value.toUpperCase();
-    }
-
-    // Generic error clearing: if the user types in a field that has an error, clear that error
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -270,46 +207,22 @@ const ClientForm: React.FC = () => {
       });
     }
 
-    // Use type assertion to tell TypeScript that `name` is a valid key
     setFormData(prev => ({ ...prev, [name as keyof ClientFormState]: newValue }));
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
     if (name === 'cpf') {
-      if (value && !validateCPF(value)) {
-        setErrors(prev => ({ ...prev, cpf: 'CPF inválido.' }));
-      }
-      // Note: we don't clear error here on success because handleChange already clears it when typing, 
-      // and we want to keep it clear.
+      if (value && !validateCPF(value)) setErrors(prev => ({ ...prev, cpf: 'CPF inválido.' }));
     }
-
-    if (name === 'cep') {
-        fetchAddressByCEP(value);
-    }
+    if (name === 'cep') fetchAddressByCEP(value);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'arquivoRg' | 'arquivoPassaporte') => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'arquivoRg' | 'arquivoPassaporte') => {
     const file = e.target.files?.[0];
-    
     if (file) {
-      // Ativa estado de carregamento/compressão para este campo específico
-      setCompressingFields(prev => ({ ...prev, [fieldName]: true }));
-      
-      try {
-        // Tenta comprimir a imagem se for maior que 2MB
-        const processedFile = await compressImage(file);
-        
-        setFormData(prev => ({ ...prev, [fieldName]: processedFile }));
-      } catch (error) {
-        console.error("Erro ao processar imagem:", error);
-        alert("Não foi possível processar a imagem selecionada. Tente outra imagem.");
-        // Limpa o input se der erro
-        e.target.value = '';
-      } finally {
-        setCompressingFields(prev => ({ ...prev, [fieldName]: false }));
-      }
+      // Apenas salva o arquivo no estado local, sem compressão
+      setFormData(prev => ({ ...prev, [fieldName]: file }));
     }
   };
 
@@ -320,8 +233,8 @@ const ClientForm: React.FC = () => {
   const resetForm = () => {
     setFormData(initialFormData);
     setErrors({});
-    setSignatureKey(prev => prev + 1); // Força recriação do componente de assinatura
-    setProtocolNumber(generateProtocol()); // Gera um novo protocolo para o próximo cliente
+    setSignatureKey(prev => prev + 1);
+    setProtocolNumber(generateProtocol());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -331,47 +244,24 @@ const ClientForm: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     const newErrors: { [key: string]: string } = {};
     let isValid = true;
 
-    // Validate Required Fields
-    if (!formData.cpf) {
-      newErrors.cpf = 'CPF é obrigatório.';
-      isValid = false;
-    } else if (!validateCPF(formData.cpf)) {
-      newErrors.cpf = 'CPF inválido.';
-      isValid = false;
-    }
+    // Validações básicas
+    if (!formData.cpf) { newErrors.cpf = 'CPF é obrigatório.'; isValid = false; }
+    else if (!validateCPF(formData.cpf)) { newErrors.cpf = 'CPF inválido.'; isValid = false; }
 
-    if (!formData.celular) {
-      newErrors.celular = 'Celular é obrigatório.';
-      isValid = false;
-    } else if (formData.celular.length < 14) { // Simple length check for (XX) XXXXX-XXXX
-        newErrors.celular = 'Celular incompleto.';
-        isValid = false;
-    }
+    if (!formData.celular) { newErrors.celular = 'Celular é obrigatório.'; isValid = false; }
+    else if (formData.celular.length < 14) { newErrors.celular = 'Celular incompleto.'; isValid = false; }
 
-    if (!formData.email) {
-      newErrors.email = 'E-mail é obrigatório.';
-      isValid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-        newErrors.email = 'E-mail inválido.';
-        isValid = false;
-    }
-
-    // Validar se ainda está comprimindo alguma imagem
-    const isCompressingAny = Object.values(compressingFields).some(v => v);
-    if (isCompressingAny) {
-      alert("Aguarde o processamento das imagens antes de enviar.");
-      return;
-    }
+    if (!formData.email) { newErrors.email = 'E-mail é obrigatório.'; isValid = false; }
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) { newErrors.email = 'E-mail inválido.'; isValid = false; }
 
     if (!isValid) {
       setErrors(prev => ({ ...prev, ...newErrors }));
-      
       const firstErrorField = Object.keys(newErrors)[0];
       const element = document.getElementsByName(firstErrorField)[0];
       if (element) {
@@ -383,25 +273,20 @@ const ClientForm: React.FC = () => {
 
     setIsSubmitting(true);
 
-    try {
-      // Salva no IndexedDB
-      await db.clients.add({
-        ...formData,
-        protocolo: protocolNumber,
-        createdAt: new Date(),
+    // SIMULAÇÃO DE ENVIO
+    setTimeout(() => {
+      console.log("=== DADOS DO FORMULÁRIO (SIMULAÇÃO) ===");
+      console.log(formData);
+      console.log("Arquivos prontos para upload:", {
+        rg: formData.arquivoRg?.name,
+        passaporte: formData.arquivoPassaporte?.name
       });
-
-      console.log("Dados salvos no banco de dados local com sucesso.");
       
-      alert("Cadastro realizado com sucesso!");
+      alert(`Cadastro simulado com sucesso! Protocolo: ${protocolNumber}\n\n(Nenhum dado foi salvo no banco de dados)`);
+      
       resetForm();
-      
-    } catch (error) {
-      console.error("Erro ao salvar no banco de dados:", error);
-      alert("Ocorreu um erro ao salvar os dados. Por favor, tente novamente.");
-    } finally {
       setIsSubmitting(false);
-    }
+    }, 1000);
   };
 
   return (
@@ -429,170 +314,31 @@ const ClientForm: React.FC = () => {
         <SectionHeader title="Identificação" />
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Input 
-            label="Nome" 
-            name="nome" 
-            placeholder="Ex: João" 
-            value={formData.nome} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="Sobrenome" 
-            name="sobrenome" 
-            placeholder="Ex: Silva" 
-            value={formData.sobrenome} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="Data de Nascimento" 
-            name="dataNascimento" 
-            type="tel"
-            placeholder="DD/MM/AAAA" 
-            value={formData.dataNascimento} 
-            onChange={handleChange}
-            maxLength={10}
-            className="md:col-span-1"
-          />
-          <Select 
-            label="Sexo" 
-            name="sexo" 
-            options={[
-              { value: 'M', label: 'Masculino' },
-              { value: 'F', label: 'Feminino' }
-            ]}
-            value={formData.sexo}
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
+          <Input label="Nome" name="nome" placeholder="Ex: João" value={formData.nome} onChange={handleChange} className="md:col-span-1" />
+          <Input label="Sobrenome" name="sobrenome" placeholder="Ex: Silva" value={formData.sobrenome} onChange={handleChange} className="md:col-span-1" />
+          <Input label="Data de Nascimento" name="dataNascimento" type="tel" placeholder="DD/MM/AAAA" value={formData.dataNascimento} onChange={handleChange} maxLength={10} className="md:col-span-1" />
+          <Select label="Sexo" name="sexo" options={[{ value: 'M', label: 'Masculino' }, { value: 'F', label: 'Feminino' }]} value={formData.sexo} onChange={handleChange} className="md:col-span-1" />
           
-          <Input 
-            label="CPF*" 
-            name="cpf" 
-            placeholder="000.000.000-00" 
-            value={formData.cpf} 
-            onChange={handleChange}
-            onBlur={handleBlur}
-            error={errors.cpf}
-            required
-            maxLength={14}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="RG" 
-            name="rg" 
-            value={formData.rg} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="UF RG" 
-            name="ufRg" 
-            placeholder="Ex: SESP-PR" 
-            value={formData.ufRg} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="Passaporte" 
-            name="passaporte" 
-            placeholder="Ex: FA123456" 
-            value={formData.passaporte} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
+          <Input label="CPF*" name="cpf" placeholder="000.000.000-00" value={formData.cpf} onChange={handleChange} onBlur={handleBlur} error={errors.cpf} required maxLength={14} className="md:col-span-1" />
+          <Input label="RG" name="rg" value={formData.rg} onChange={handleChange} className="md:col-span-1" />
+          <Input label="UF RG" name="ufRg" placeholder="Ex: SESP-PR" value={formData.ufRg} onChange={handleChange} className="md:col-span-1" />
+          <Input label="Passaporte" name="passaporte" placeholder="Ex: FA123456" value={formData.passaporte} onChange={handleChange} className="md:col-span-1" />
         </div>
 
         {/* ENDEREÇO E CONTATO */}
         <SectionHeader title="Endereço e Contato" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Input 
-            label="CEP" 
-            name="cep" 
-            placeholder="00000-000" 
-            value={formData.cep} 
-            onChange={handleChange}
-            onBlur={handleBlur}
-            error={errors.cep}
-            maxLength={9}
-            className="md:col-span-1"
-            disabled={loadingAddress}
-          />
-          <Input 
-            label="Endereço" 
-            name="endereco" 
-            value={formData.endereco} 
-            onChange={handleChange}
-            className="md:col-span-2"
-          />
-          <Input 
-            label="Número" 
-            name="numero" 
-            value={formData.numero} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-
-          <Input 
-            label="Bairro" 
-            name="bairro" 
-            value={formData.bairro} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="Complemento" 
-            name="complemento" 
-            value={formData.complemento} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="Cidade" 
-            name="cidade" 
-            value={formData.cidade} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="Estado" 
-            name="estado" 
-            value={formData.estado} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-
-          <Input 
-            label="País" 
-            name="pais" 
-            value={formData.pais} 
-            onChange={handleChange}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="Celular*" 
-            name="celular" 
-            placeholder="(00) 00000-0000" 
-            value={formData.celular} 
-            onChange={handleChange}
-            error={errors.celular}
-            required
-            maxLength={15}
-            className="md:col-span-1"
-          />
-          <Input 
-            label="E-mail*" 
-            name="email" 
-            type="email"
-            placeholder="cliente@email.com" 
-            value={formData.email} 
-            onChange={handleChange}
-            error={errors.email}
-            required
-            className="md:col-span-2"
-          />
+          <Input label="CEP" name="cep" placeholder="00000-000" value={formData.cep} onChange={handleChange} onBlur={handleBlur} error={errors.cep} maxLength={9} className="md:col-span-1" disabled={loadingAddress} />
+          <Input label="Endereço" name="endereco" value={formData.endereco} onChange={handleChange} className="md:col-span-2" />
+          <Input label="Número" name="numero" value={formData.numero} onChange={handleChange} className="md:col-span-1" />
+          <Input label="Bairro" name="bairro" value={formData.bairro} onChange={handleChange} className="md:col-span-1" />
+          <Input label="Complemento" name="complemento" value={formData.complemento} onChange={handleChange} className="md:col-span-1" />
+          <Input label="Cidade" name="cidade" value={formData.cidade} onChange={handleChange} className="md:col-span-1" />
+          <Input label="Estado" name="estado" value={formData.estado} onChange={handleChange} className="md:col-span-1" />
+          <Input label="País" name="pais" value={formData.pais} onChange={handleChange} className="md:col-span-1" />
+          <Input label="Celular*" name="celular" placeholder="(00) 00000-0000" value={formData.celular} onChange={handleChange} error={errors.celular} required maxLength={15} className="md:col-span-1" />
+          <Input label="E-mail*" name="email" type="email" placeholder="cliente@email.com" value={formData.email} onChange={handleChange} error={errors.email} required className="md:col-span-2" />
         </div>
 
         {/* DOCUMENTOS */}
@@ -600,122 +346,44 @@ const ClientForm: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row gap-4">
           {/* RG UPLOAD */}
-          <label 
-            htmlFor="arquivoRg"
-            className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden
-              ${formData.arquivoRg 
-                ? 'border-green-500 bg-green-50 text-green-700' 
-                : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}
-            `}
-          >
-            {compressingFields['arquivoRg'] ? (
-              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-            ) : formData.arquivoRg ? (
-              <CheckCircle className="w-5 h-5 text-green-500" />
-            ) : (
-              <Camera className="w-5 h-5 text-blue-500" />
-            )}
-            
+          <label htmlFor="arquivoRg" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoRg ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
+            {formData.arquivoRg ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Camera className="w-5 h-5 text-blue-500" />}
             <div className="flex flex-col items-center sm:items-start z-10">
-              <span className="text-sm font-medium">
-                {compressingFields['arquivoRg'] 
-                  ? 'Comprimindo...' 
-                  : formData.arquivoRg 
-                    ? 'Arquivo RG Pronto' 
-                    : 'Foto RG/CPF/CNH'}
-              </span>
-              {formData.arquivoRg && !compressingFields['arquivoRg'] && (
-                <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>
-              )}
+              <span className="text-sm font-medium">{formData.arquivoRg ? 'Arquivo RG Selecionado' : 'Foto RG/CPF/CNH'}</span>
+              {formData.arquivoRg && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>}
             </div>
-            <input 
-              id="arquivoRg"
-              type="file" 
-              className="sr-only" 
-              accept="image/*" 
-              onChange={(e) => handleFileChange(e, 'arquivoRg')}
-              onClick={(e) => (e.target as HTMLInputElement).value = ''}
-              disabled={compressingFields['arquivoRg']}
-            />
+            <input id="arquivoRg" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoRg')} onClick={(e) => (e.target as HTMLInputElement).value = ''} />
           </label>
 
           {/* PASSAPORTE UPLOAD */}
-          <label 
-            htmlFor="arquivoPassaporte"
-            className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden
-              ${formData.arquivoPassaporte 
-                ? 'border-green-500 bg-green-50 text-green-700' 
-                : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}
-            `}
-          >
-            {compressingFields['arquivoPassaporte'] ? (
-               <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-            ) : formData.arquivoPassaporte ? (
-              <CheckCircle className="w-5 h-5 text-green-500" />
-            ) : (
-              <Upload className="w-5 h-5 text-blue-500" />
-            )}
-            
+          <label htmlFor="arquivoPassaporte" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoPassaporte ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
+            {formData.arquivoPassaporte ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Upload className="w-5 h-5 text-blue-500" />}
             <div className="flex flex-col items-center sm:items-start z-10">
-               <span className="text-sm font-medium">
-                 {compressingFields['arquivoPassaporte'] 
-                    ? 'Comprimindo...' 
-                    : formData.arquivoPassaporte 
-                      ? 'Arquivo Passaporte Pronto' 
-                      : 'Foto Passaporte'}
-               </span>
-               {formData.arquivoPassaporte && !compressingFields['arquivoPassaporte'] && (
-                 <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>
-               )}
+               <span className="text-sm font-medium">{formData.arquivoPassaporte ? 'Arquivo Passaporte Selecionado' : 'Foto Passaporte'}</span>
+               {formData.arquivoPassaporte && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>}
             </div>
-            <input 
-              id="arquivoPassaporte"
-              type="file" 
-              className="sr-only" 
-              accept="image/*"
-              onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} 
-              onClick={(e) => (e.target as HTMLInputElement).value = ''}
-              disabled={compressingFields['arquivoPassaporte']}
-            />
+            <input id="arquivoPassaporte" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} onClick={(e) => (e.target as HTMLInputElement).value = ''} />
           </label>
         </div>
 
         {/* OBSERVAÇÕES */}
         <SectionHeader title="Observações" />
-        
         <div className="w-full">
-          <textarea
-            name="observacoes"
-            rows={4}
-            className="w-full border border-gray-300 rounded p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm bg-white"
-            placeholder="Informações adicionais"
-            value={formData.observacoes}
-            onChange={handleChange}
-          ></textarea>
+          <textarea name="observacoes" rows={4} className="w-full border border-gray-300 rounded p-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm bg-white" placeholder="Informações adicionais" value={formData.observacoes} onChange={handleChange}></textarea>
         </div>
 
         {/* ASSINATURA DIGITAL */}
         <SectionHeader title="Assinatura Digital" />
-        
         <div className="mb-8">
            <SignaturePad key={signatureKey} onEnd={handleSignature} />
         </div>
 
         <div className="flex justify-end pt-6 border-t border-gray-200 gap-4">
-            <button
-              type="button"
-              onClick={handleClear}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200"
-              disabled={isSubmitting}
-            >
+            <button type="button" onClick={handleClear} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200" disabled={isSubmitting}>
               Limpar
             </button>
-            <button
-              type="submit"
-              className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isSubmitting || Object.values(compressingFields).some(v => v)}
-            >
-              {isSubmitting ? 'Enviando...' : 'Enviar'}
+            <button type="submit" className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting}>
+              {isSubmitting ? 'Enviando (Simulado)...' : 'Enviar'}
             </button>
         </div>
 

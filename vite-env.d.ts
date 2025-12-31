@@ -1,8 +1,2 @@
-// Fixed: "Cannot find type definition file for 'vite/client'"
-// The reference is commented out to resolve the build error as the type definition is missing.
+// Fix: Commenting out the reference to vite/client as the type definition file is reported missing.
 // /// <reference types="vite/client" />
-
-declare module '*.png' {
-  const value: string;
-  export default value;
-}
