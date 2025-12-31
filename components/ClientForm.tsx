@@ -145,6 +145,14 @@ const ClientForm: React.FC = () => {
       .slice(0, 9);
   };
 
+  const formatDate = (value: string) => {
+    return value
+      .replace(/\D/g, '') // Remove tudo que não é dígito
+      .replace(/(\d{2})(\d)/, '$1/$2') // Adiciona barra após o dia
+      .replace(/(\d{2})(\d)/, '$1/$2') // Adiciona barra após o mês
+      .replace(/(\d{4})\d+?$/, '$1'); // Limita o ano a 4 dígitos
+  };
+
   const fetchAddressByCEP = async (cep: string) => {
     const cleanCEP = cep.replace(/\D/g, '');
     if (cleanCEP.length !== 8) return;
@@ -230,6 +238,11 @@ const ClientForm: React.FC = () => {
         });
         return;
       }
+    }
+
+    // Apply mask to Data Nascimento
+    if (name === 'dataNascimento') {
+      newValue = formatDate(value);
     }
 
     // Generic error clearing: if the user types in a field that has an error, clear that error
@@ -376,10 +389,11 @@ const ClientForm: React.FC = () => {
           <Input 
             label="Data de Nascimento" 
             name="dataNascimento" 
-            type="date"
+            type="tel"
             placeholder="DD/MM/AAAA" 
             value={formData.dataNascimento} 
             onChange={handleChange}
+            maxLength={10}
             className="md:col-span-1"
           />
           <Select 
@@ -387,8 +401,7 @@ const ClientForm: React.FC = () => {
             name="sexo" 
             options={[
               { value: 'M', label: 'Masculino' },
-              { value: 'F', label: 'Feminino' },
-              { value: 'O', label: 'Outro' }
+              { value: 'F', label: 'Feminino' }
             ]}
             value={formData.sexo}
             onChange={handleChange}
