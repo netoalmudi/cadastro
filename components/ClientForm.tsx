@@ -539,7 +539,6 @@ const ClientForm: React.FC = () => {
               type="file" 
               className="hidden" 
               accept="image/*" 
-              capture="environment"
               onChange={(e) => handleFileChange(e, 'arquivoRg')}
             />
           </label>
@@ -556,7 +555,6 @@ const ClientForm: React.FC = () => {
               type="file" 
               className="hidden" 
               accept="image/*"
-              capture="environment"
               onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} 
             />
           </label>
