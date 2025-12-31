@@ -1,5 +1,5 @@
 {
-  "name": "Cadastro de Clientes",
+  "name": "Cadastro de Cliente",
   "description": "A responsive customer registration form featuring identification, address, document upload, and digital signature capture.",
   "requestFramePermissions": [
     "camera"

@@ -47,23 +47,9 @@ interface ViaCepResponse {
 const ClientForm: React.FC = () => {
   const protocolNumber = "202512-7434"; // Mock protocol
   
-  // Safe resolution of logo URL to prevent crashes in environments where import.meta.url is problematic
-  const getLogoUrl = () => {
-    try {
-      // Try to construct URL relative to current module
-      if (typeof import.meta !== 'undefined' && import.meta.url) {
-        return new URL('./image.png', import.meta.url).href;
-      }
-      // Fallback if import.meta is missing
-      return 'https://raw.githubusercontent.com/oa-79/b95079a4-a151-4f10-b5ef-770c87d603a1/image.png';
-    } catch (e) {
-      // Fallback on any error (like Invalid URL)
-      console.warn('Could not resolve local logo path:', e);
-      return 'https://raw.githubusercontent.com/oa-79/b95079a4-a151-4f10-b5ef-770c87d603a1/image.png';
-    }
-  };
-
-  const logoUrl = getLogoUrl();
+  // Use a Data URI for a reliable, zero-dependency logo
+  const logoSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 350 100'%3E%3Cpath fill='%230056b3' d='M50 20 L80 50 L50 80 L40 50 Z'/%3E%3Ccircle cx='55' cy='50' r='38' stroke='%230056b3' stroke-width='2' fill='none' opacity='0.2'/%3E%3Ctext x='100' y='48' font-family='ui-sans-serif, system-ui, sans-serif' font-weight='bold' font-size='28' fill='%230056b3'%3ENeto Almudi%3C/text%3E%3Ctext x='100' y='75' font-family='ui-sans-serif, system-ui, sans-serif' font-size='16' fill='%23666' letter-spacing='4'%3EVIAGENS%3C/text%3E%3C/svg%3E";
+  
   const [imageError, setImageError] = useState(false);
 
   const [formData, setFormData] = useState<ClientFormState>({
@@ -326,10 +312,13 @@ const ClientForm: React.FC = () => {
         <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
             {!imageError ? (
               <img 
-                src={logoUrl} 
+                src={logoSrc} 
                 alt="Neto Almudi Viagens" 
                 className="h-28 w-auto object-contain transition-transform hover:scale-105"
-                onError={() => setImageError(true)}
+                onError={(e) => {
+                  console.error("Failed to load logo, switching to fallback");
+                  setImageError(true);
+                }}
               />
             ) : (
               <div className="flex items-center gap-2 text-primary">
@@ -341,7 +330,7 @@ const ClientForm: React.FC = () => {
             )}
             {!imageError && (
               <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center md:text-left">
-                Cadastro de Clientes
+                Cadastro de Cliente
               </h1>
             )}
         </div>
