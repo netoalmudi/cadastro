@@ -3,7 +3,9 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import { Camera, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { db } from '../db/database';
+import { compressImage } from '../utils/imageUtils';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -47,21 +49,25 @@ interface ViaCepResponse {
   erro?: boolean;
 }
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB em bytes
-
 const ClientForm: React.FC = () => {
   // Gera o protocolo: YYYYMM-XXXX (4 dígitos aleatórios)
-  const [protocolNumber] = useState(() => {
+  const generateProtocol = () => {
     const now = new Date();
     const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0'); // Mês começa em 0
-    const random = Math.floor(1000 + Math.random() * 9000); // Garante 4 dígitos (1000-9999)
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const random = Math.floor(1000 + Math.random() * 9000);
     return `${year}${month}-${random}`;
-  });
+  };
+
+  const [protocolNumber, setProtocolNumber] = useState(generateProtocol());
 
   // Estado para controlar a re-renderização do SignaturePad ao limpar
   const [signatureKey, setSignatureKey] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Estado para controlar quais campos de arquivo estão sendo comprimidos
+  const [compressingFields, setCompressingFields] = useState<{ [key: string]: boolean }>({});
+
   const initialFormData: ClientFormState = {
     nome: '',
     sobrenome: '',
@@ -284,17 +290,26 @@ const ClientForm: React.FC = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'arquivoRg' | 'arquivoPassaporte') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'arquivoRg' | 'arquivoPassaporte') => {
     const file = e.target.files?.[0];
     
     if (file) {
-      if (file.size > MAX_FILE_SIZE) {
-        alert("O arquivo selecionado excede o tamanho máximo permitido de 2MB.");
-        e.target.value = ''; // Limpa o input
-        return;
-      }
+      // Ativa estado de carregamento/compressão para este campo específico
+      setCompressingFields(prev => ({ ...prev, [fieldName]: true }));
       
-      setFormData(prev => ({ ...prev, [fieldName]: file }));
+      try {
+        // Tenta comprimir a imagem se for maior que 2MB
+        const processedFile = await compressImage(file);
+        
+        setFormData(prev => ({ ...prev, [fieldName]: processedFile }));
+      } catch (error) {
+        console.error("Erro ao processar imagem:", error);
+        alert("Não foi possível processar a imagem selecionada. Tente outra imagem.");
+        // Limpa o input se der erro
+        e.target.value = '';
+      } finally {
+        setCompressingFields(prev => ({ ...prev, [fieldName]: false }));
+      }
     }
   };
 
@@ -302,16 +317,21 @@ const ClientForm: React.FC = () => {
     setFormData(prev => ({ ...prev, assinatura: sig }));
   };
 
+  const resetForm = () => {
+    setFormData(initialFormData);
+    setErrors({});
+    setSignatureKey(prev => prev + 1); // Força recriação do componente de assinatura
+    setProtocolNumber(generateProtocol()); // Gera um novo protocolo para o próximo cliente
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleClear = () => {
     if (window.confirm("Tem certeza que deseja limpar todos os campos do formulário?")) {
-      setFormData(initialFormData);
-      setErrors({});
-      setSignatureKey(prev => prev + 1); // Força recriação do componente de assinatura
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      resetForm();
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const newErrors: { [key: string]: string } = {};
@@ -342,32 +362,46 @@ const ClientForm: React.FC = () => {
         isValid = false;
     }
 
+    // Validar se ainda está comprimindo alguma imagem
+    const isCompressingAny = Object.values(compressingFields).some(v => v);
+    if (isCompressingAny) {
+      alert("Aguarde o processamento das imagens antes de enviar.");
+      return;
+    }
+
     if (!isValid) {
       setErrors(prev => ({ ...prev, ...newErrors }));
       
-      // Find the first error field to scroll to (optional user experience enhancement)
       const firstErrorField = Object.keys(newErrors)[0];
       const element = document.getElementsByName(firstErrorField)[0];
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         element.focus();
       }
-      
       return;
     }
 
-    console.log("Form Submitted:", formData);
-    // Para verificação do arquivo no log
-    if (formData.arquivoRg) console.log("Arquivo RG:", formData.arquivoRg.name);
-    if (formData.arquivoPassaporte) console.log("Arquivo Passaporte:", formData.arquivoPassaporte.name);
-    
-    // Simula o salvamento e limpa o formulário
-    alert("Cadastro realizado com sucesso!");
-    
-    setFormData(initialFormData);
-    setErrors({});
-    setSignatureKey(prev => prev + 1); // Força recriação do componente de assinatura
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsSubmitting(true);
+
+    try {
+      // Salva no IndexedDB
+      await db.clients.add({
+        ...formData,
+        protocolo: protocolNumber,
+        createdAt: new Date(),
+      });
+
+      console.log("Dados salvos no banco de dados local com sucesso.");
+      
+      alert("Cadastro realizado com sucesso!");
+      resetForm();
+      
+    } catch (error) {
+      console.error("Erro ao salvar no banco de dados:", error);
+      alert("Ocorreu um erro ao salvar os dados. Por favor, tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -565,16 +599,34 @@ const ClientForm: React.FC = () => {
         <SectionHeader title="Documentos" />
 
         <div className="flex flex-col sm:flex-row gap-4">
+          {/* RG UPLOAD */}
           <label 
             htmlFor="arquivoRg"
-            className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed ${formData.arquivoRg ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700'} rounded hover:bg-opacity-80 cursor-pointer transition w-full sm:w-auto`}
+            className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden
+              ${formData.arquivoRg 
+                ? 'border-green-500 bg-green-50 text-green-700' 
+                : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}
+            `}
           >
-            {formData.arquivoRg ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Camera className="w-5 h-5 text-blue-500" />}
-            <div className="flex flex-col items-center sm:items-start">
+            {compressingFields['arquivoRg'] ? (
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+            ) : formData.arquivoRg ? (
+              <CheckCircle className="w-5 h-5 text-green-500" />
+            ) : (
+              <Camera className="w-5 h-5 text-blue-500" />
+            )}
+            
+            <div className="flex flex-col items-center sm:items-start z-10">
               <span className="text-sm font-medium">
-                {formData.arquivoRg ? 'Arquivo RG Selecionado' : 'Foto RG/CPF/CNH (Máx 2MB)'}
+                {compressingFields['arquivoRg'] 
+                  ? 'Comprimindo...' 
+                  : formData.arquivoRg 
+                    ? 'Arquivo RG Pronto' 
+                    : 'Foto RG/CPF/CNH'}
               </span>
-              {formData.arquivoRg && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>}
+              {formData.arquivoRg && !compressingFields['arquivoRg'] && (
+                <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>
+              )}
             </div>
             <input 
               id="arquivoRg"
@@ -583,19 +635,38 @@ const ClientForm: React.FC = () => {
               accept="image/*" 
               onChange={(e) => handleFileChange(e, 'arquivoRg')}
               onClick={(e) => (e.target as HTMLInputElement).value = ''}
+              disabled={compressingFields['arquivoRg']}
             />
           </label>
 
+          {/* PASSAPORTE UPLOAD */}
           <label 
             htmlFor="arquivoPassaporte"
-            className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed ${formData.arquivoPassaporte ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700'} rounded hover:bg-opacity-80 cursor-pointer transition w-full sm:w-auto`}
+            className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden
+              ${formData.arquivoPassaporte 
+                ? 'border-green-500 bg-green-50 text-green-700' 
+                : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}
+            `}
           >
-            {formData.arquivoPassaporte ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Upload className="w-5 h-5 text-blue-500" />}
-            <div className="flex flex-col items-center sm:items-start">
+            {compressingFields['arquivoPassaporte'] ? (
+               <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+            ) : formData.arquivoPassaporte ? (
+              <CheckCircle className="w-5 h-5 text-green-500" />
+            ) : (
+              <Upload className="w-5 h-5 text-blue-500" />
+            )}
+            
+            <div className="flex flex-col items-center sm:items-start z-10">
                <span className="text-sm font-medium">
-                 {formData.arquivoPassaporte ? 'Arquivo Passaporte Selecionado' : 'Foto Passaporte (Máx 2MB)'}
+                 {compressingFields['arquivoPassaporte'] 
+                    ? 'Comprimindo...' 
+                    : formData.arquivoPassaporte 
+                      ? 'Arquivo Passaporte Pronto' 
+                      : 'Foto Passaporte'}
                </span>
-               {formData.arquivoPassaporte && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>}
+               {formData.arquivoPassaporte && !compressingFields['arquivoPassaporte'] && (
+                 <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>
+               )}
             </div>
             <input 
               id="arquivoPassaporte"
@@ -604,6 +675,7 @@ const ClientForm: React.FC = () => {
               accept="image/*"
               onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} 
               onClick={(e) => (e.target as HTMLInputElement).value = ''}
+              disabled={compressingFields['arquivoPassaporte']}
             />
           </label>
         </div>
@@ -634,14 +706,16 @@ const ClientForm: React.FC = () => {
               type="button"
               onClick={handleClear}
               className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200"
+              disabled={isSubmitting}
             >
               Limpar
             </button>
             <button
               type="submit"
-              className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5"
+              className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting || Object.values(compressingFields).some(v => v)}
             >
-              Enviar
+              {isSubmitting ? 'Enviando...' : 'Enviar'}
             </button>
         </div>
 
