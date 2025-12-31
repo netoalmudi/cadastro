@@ -3,7 +3,7 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, ImageOff } from 'lucide-react';
+import { Camera, Upload } from 'lucide-react';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -47,11 +47,6 @@ interface ViaCepResponse {
 const ClientForm: React.FC = () => {
   const protocolNumber = "202512-7434"; // Mock protocol
   
-  // Use a Data URI for a reliable, zero-dependency logo
-  const logoSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 350 100'%3E%3Cpath fill='%230056b3' d='M50 20 L80 50 L50 80 L40 50 Z'/%3E%3Ccircle cx='55' cy='50' r='38' stroke='%230056b3' stroke-width='2' fill='none' opacity='0.2'/%3E%3Ctext x='100' y='48' font-family='ui-sans-serif, system-ui, sans-serif' font-weight='bold' font-size='28' fill='%230056b3'%3ENeto Almudi%3C/text%3E%3Ctext x='100' y='75' font-family='ui-sans-serif, system-ui, sans-serif' font-size='16' fill='%23666' letter-spacing='4'%3EVIAGENS%3C/text%3E%3C/svg%3E";
-  
-  const [imageError, setImageError] = useState(false);
-
   const [formData, setFormData] = useState<ClientFormState>({
     nome: '',
     sobrenome: '',
@@ -309,30 +304,13 @@ const ClientForm: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white shadow-sm sm:rounded-lg border border-gray-100 mt-6 mb-12">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center border-b-2 border-primary pb-6 mb-8 gap-4">
-        <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-            {!imageError ? (
-              <img 
-                src={logoSrc} 
-                alt="Neto Almudi Viagens" 
-                className="h-28 w-auto object-contain transition-transform hover:scale-105"
-                onError={(e) => {
-                  console.error("Failed to load logo, switching to fallback");
-                  setImageError(true);
-                }}
-              />
-            ) : (
-              <div className="flex items-center gap-2 text-primary">
-                 <ImageOff className="w-10 h-10 opacity-50" />
-                 <h1 className="text-2xl sm:text-3xl font-bold text-center md:text-left">
-                    Neto Almudi Viagens
-                 </h1>
-              </div>
-            )}
-            {!imageError && (
-              <h1 className="text-2xl sm:text-3xl font-bold text-primary text-center md:text-left">
+        <div className="flex flex-col items-center md:items-start">
+             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                Neto Almudi Viagens
+             </h1>
+             <h2 className="text-lg sm:text-xl font-medium text-primary">
                 Cadastro de Cliente
-              </h1>
-            )}
+             </h2>
         </div>
         
         <div className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200 shadow-sm">
