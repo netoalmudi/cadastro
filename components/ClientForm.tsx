@@ -3,7 +3,8 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, CheckCircle } from 'lucide-react';
+import { Camera, Upload, CheckCircle, Loader2 } from 'lucide-react';
+import { compressImage } from '../utils/imageUtils';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -62,6 +63,9 @@ const ClientForm: React.FC = () => {
   // Estado para controlar a re-renderização do SignaturePad ao limpar
   const [signatureKey, setSignatureKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Estado para controlar qual arquivo está sendo processado (comprimido)
+  const [processingFile, setProcessingFile] = useState<'arquivoRg' | 'arquivoPassaporte' | null>(null);
   
   const initialFormData: ClientFormState = {
     nome: '',
@@ -218,11 +222,21 @@ const ClientForm: React.FC = () => {
     if (name === 'cep') fetchAddressByCEP(value);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'arquivoRg' | 'arquivoPassaporte') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'arquivoRg' | 'arquivoPassaporte') => {
     const file = e.target.files?.[0];
     if (file) {
-      // Apenas salva o arquivo no estado local, sem compressão
-      setFormData(prev => ({ ...prev, [fieldName]: file }));
+      setProcessingFile(fieldName);
+      try {
+        // Redimensiona a imagem para no máximo 1MB
+        const compressedFile = await compressImage(file, 1);
+        setFormData(prev => ({ ...prev, [fieldName]: compressedFile }));
+      } catch (error) {
+        console.error("Erro ao processar imagem", error);
+        // Em caso de erro, salva o original
+        setFormData(prev => ({ ...prev, [fieldName]: file }));
+      } finally {
+        setProcessingFile(null);
+      }
     }
   };
 
@@ -277,9 +291,17 @@ const ClientForm: React.FC = () => {
     setTimeout(() => {
       console.log("=== DADOS DO FORMULÁRIO (SIMULAÇÃO) ===");
       console.log(formData);
-      console.log("Arquivos prontos para upload:", {
-        rg: formData.arquivoRg?.name,
-        passaporte: formData.arquivoPassaporte?.name
+      console.log("Arquivos prontos para upload (tamanho final):", {
+        rg: { 
+          name: formData.arquivoRg?.name, 
+          size: formData.arquivoRg?.size,
+          type: formData.arquivoRg?.type
+        },
+        passaporte: {
+          name: formData.arquivoPassaporte?.name,
+          size: formData.arquivoPassaporte?.size,
+          type: formData.arquivoPassaporte?.type
+        }
       });
       
       alert(`Cadastro simulado com sucesso! Protocolo: ${protocolNumber}\n\n(Nenhum dado foi salvo no banco de dados)`);
@@ -347,22 +369,50 @@ const ClientForm: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-4">
           {/* RG UPLOAD */}
           <label htmlFor="arquivoRg" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoRg ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
-            {formData.arquivoRg ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Camera className="w-5 h-5 text-blue-500" />}
+            {processingFile === 'arquivoRg' ? (
+              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+            ) : formData.arquivoRg ? (
+              <CheckCircle className="w-5 h-5 text-green-500" />
+            ) : (
+              <Camera className="w-5 h-5 text-blue-500" />
+            )}
             <div className="flex flex-col items-center sm:items-start z-10">
-              <span className="text-sm font-medium">{formData.arquivoRg ? 'Arquivo RG Selecionado' : 'Foto RG/CPF/CNH'}</span>
-              {formData.arquivoRg && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>}
+              <span className="text-sm font-medium">
+                {processingFile === 'arquivoRg' 
+                  ? 'Processando imagem...' 
+                  : formData.arquivoRg 
+                    ? 'Arquivo RG Selecionado' 
+                    : 'Foto RG/CPF/CNH'}
+              </span>
+              {formData.arquivoRg && !processingFile && (
+                <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>
+              )}
             </div>
-            <input id="arquivoRg" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoRg')} onClick={(e) => (e.target as HTMLInputElement).value = ''} />
+            <input id="arquivoRg" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoRg')} onClick={(e) => (e.target as HTMLInputElement).value = ''} disabled={!!processingFile} />
           </label>
 
           {/* PASSAPORTE UPLOAD */}
           <label htmlFor="arquivoPassaporte" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoPassaporte ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
-            {formData.arquivoPassaporte ? <CheckCircle className="w-5 h-5 text-green-500" /> : <Upload className="w-5 h-5 text-blue-500" />}
+            {processingFile === 'arquivoPassaporte' ? (
+              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+            ) : formData.arquivoPassaporte ? (
+              <CheckCircle className="w-5 h-5 text-green-500" />
+            ) : (
+              <Upload className="w-5 h-5 text-blue-500" />
+            )}
             <div className="flex flex-col items-center sm:items-start z-10">
-               <span className="text-sm font-medium">{formData.arquivoPassaporte ? 'Arquivo Passaporte Selecionado' : 'Foto Passaporte'}</span>
-               {formData.arquivoPassaporte && <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>}
+               <span className="text-sm font-medium">
+                 {processingFile === 'arquivoPassaporte' 
+                   ? 'Processando imagem...' 
+                   : formData.arquivoPassaporte 
+                     ? 'Arquivo Passaporte Selecionado' 
+                     : 'Foto Passaporte'}
+               </span>
+               {formData.arquivoPassaporte && !processingFile && (
+                 <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>
+               )}
             </div>
-            <input id="arquivoPassaporte" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} onClick={(e) => (e.target as HTMLInputElement).value = ''} />
+            <input id="arquivoPassaporte" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} onClick={(e) => (e.target as HTMLInputElement).value = ''} disabled={!!processingFile} />
           </label>
         </div>
 
@@ -379,10 +429,10 @@ const ClientForm: React.FC = () => {
         </div>
 
         <div className="flex justify-end pt-6 border-t border-gray-200 gap-4">
-            <button type="button" onClick={handleClear} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200" disabled={isSubmitting}>
+            <button type="button" onClick={handleClear} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200" disabled={isSubmitting || !!processingFile}>
               Limpar
             </button>
-            <button type="submit" className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting}>
+            <button type="submit" className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting || !!processingFile}>
               {isSubmitting ? 'Enviando (Simulado)...' : 'Enviar'}
             </button>
         </div>
