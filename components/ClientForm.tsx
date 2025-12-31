@@ -541,7 +541,7 @@ const ClientForm: React.FC = () => {
               type="submit"
               className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5"
             >
-              Salvar Cadastro
+              Enviar
             </button>
         </div>
 
