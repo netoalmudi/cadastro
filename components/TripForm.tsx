@@ -3,7 +3,7 @@ import { supabase } from '../db/database';
 import { Trip, Client } from '../types';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
-import { ArrowLeft, Save, Calendar, Clock, MapPin, Users, Search, X, Plus, Trash2, Check, DollarSign, Calculator } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, Clock, MapPin, Users, Search, X, Plus, Trash2, Check, DollarSign, Calculator, Star, Crown } from 'lucide-react';
 
 interface TripFormProps {
   initialData?: Trip | null;
@@ -27,6 +27,7 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
     valor_diaria: '',
     valor_km: '',
     valor_guia: '',
+    contratante_id: null,
   });
 
   // Alterado para aceitar string (UUID) ou number
@@ -64,6 +65,7 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
         valor_diaria: initialData.valor_diaria || '',
         valor_km: initialData.valor_km || '',
         valor_guia: initialData.valor_guia || '',
+        contratante_id: initialData.contratante_id || null,
       });
       fetchTripClients(initialData.id);
     }
@@ -114,6 +116,18 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
 
   const removeClient = (clientId: number | string) => {
     setSelectedClientIds(prev => prev.filter(id => id !== clientId));
+    // Se o cliente removido era o contratante, limpa o campo
+    if (formData.contratante_id === clientId) {
+      setFormData(prev => ({ ...prev, contratante_id: null }));
+    }
+  };
+
+  const toggleContractor = (clientId: number | string) => {
+    setFormData(prev => ({
+      ...prev,
+      // Se já for este o contratante, desmarca (null). Se for outro, marca este.
+      contratante_id: prev.contratante_id === clientId ? null : clientId
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -413,9 +427,14 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
               <Users size={18} />
               Passageiros Adicionados
             </span>
-            <span className="text-xs font-bold bg-primary text-white px-2 py-1 rounded-full">
-              {selectedClientIds.length}
-            </span>
+            <div className="flex gap-2">
+                <span className="text-xs font-medium bg-yellow-100 text-yellow-800 px-2 py-1 rounded-md flex items-center gap-1 border border-yellow-200">
+                    <Star size={12} fill="currentColor" /> Contratante
+                </span>
+                <span className="text-xs font-bold bg-primary text-white px-2 py-1 rounded-full">
+                    {selectedClientIds.length}
+                </span>
+            </div>
           </div>
           
           {selectedClientsList.length === 0 ? (
@@ -426,30 +445,57 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {selectedClientsList.map(client => (
-                <div key={client.id} className="flex justify-between items-center px-4 py-3 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                       {client.nome.charAt(0)}{client.sobrenome.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{client.nome} {client.sobrenome}</div>
-                      <div className="text-xs text-gray-500 flex gap-3">
-                        <span>CPF: {client.cpf}</span>
-                        <span>Tel: {client.celular}</span>
+              {selectedClientsList.map(client => {
+                const isContractor = formData.contratante_id === client.id;
+                
+                return (
+                  <div key={client.id} className={`flex justify-between items-center px-4 py-3 transition-colors ${isContractor ? 'bg-yellow-50 border-l-4 border-yellow-400' : 'hover:bg-gray-50'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${isContractor ? 'bg-yellow-200 text-yellow-800 ring-2 ring-yellow-400 ring-offset-1' : 'bg-blue-100 text-blue-700'}`}>
+                         {isContractor ? <Crown size={14} /> : `${client.nome.charAt(0)}${client.sobrenome.charAt(0)}`}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                            <div className={`text-sm font-medium ${isContractor ? 'text-yellow-900 font-bold' : 'text-gray-900'}`}>
+                                {client.nome} {client.sobrenome}
+                            </div>
+                            {isContractor && (
+                                <span className="text-[10px] uppercase font-bold bg-yellow-400 text-yellow-900 px-1.5 py-0.5 rounded">Contratante</span>
+                            )}
+                        </div>
+                        <div className="text-xs text-gray-500 flex gap-3">
+                          <span>CPF: {client.cpf}</span>
+                          <span>Tel: {client.celular}</span>
+                        </div>
                       </div>
                     </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => toggleContractor(client.id)}
+                            className={`p-2 rounded-full transition-all flex items-center gap-1 text-xs font-medium ${
+                                isContractor 
+                                ? 'text-yellow-600 bg-yellow-100 hover:bg-yellow-200' 
+                                : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'
+                            }`}
+                            title={isContractor ? "Remover contratante" : "Definir como contratante"}
+                        >
+                            <Star size={18} fill={isContractor ? "currentColor" : "none"} />
+                        </button>
+
+                        <button 
+                            type="button" 
+                            onClick={() => removeClient(client.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+                            title="Remover passageiro"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
                   </div>
-                  <button 
-                    type="button" 
-                    onClick={() => removeClient(client.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
-                    title="Remover passageiro"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

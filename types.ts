@@ -57,6 +57,9 @@ export interface Trip {
   valor_diaria?: number | string;
   valor_km?: number | string;
   valor_guia?: number | string;
+  
+  // Responsável
+  contratante_id?: number | string | null;
 }
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
