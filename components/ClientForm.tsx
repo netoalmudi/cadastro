@@ -642,11 +642,11 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         {/* ASSINATURA DIGITAL */}
         <SectionHeader title="Assinatura Digital" />
         <div className="mb-8">
-            {initialData?.assinatura && !formData.assinatura ? (
+            {initialData?.assinatura && formData.assinatura === initialData.assinatura ? (
                 <div className="border-2 border-dashed border-gray-300 rounded p-4 text-center bg-gray-50 mb-4">
                     <p className="text-sm text-gray-500 mb-2">Assinatura Atual:</p>
                     <img src={initialData.assinatura} alt="Assinatura Cliente" className="h-16 mx-auto object-contain"/>
-                    <p className="text-xs text-gray-400 mt-2">Assine abaixo apenas se desejar substituir a assinatura atual.</p>
+                    <p className="text-xs text-gray-400 mt-2">Assine abaixo para substituir a assinatura atual.</p>
                 </div>
             ) : null}
            <SignaturePad key={signatureKey} onEnd={handleSignature} />
