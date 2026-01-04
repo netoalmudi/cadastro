@@ -191,6 +191,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     const dtIda = formatDateDisplay(trip.data_ida);
     const dtVolta = formatDateDisplay(trip.data_volta);
 
+    // Gerar número do contrato baseado na data atual: AAAAMMDD
+    const today = new Date();
+    const contractNumber = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+
     const printWindow = window.open('', '', 'width=900,height=800');
     if (!printWindow) return;
 
@@ -215,7 +219,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         </head>
         <body>
           <div class="header-info">
-            Número: ${trip.id.toString().padStart(4, '0')}
+            Número: ${contractNumber}
           </div>
 
           <h1>CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE TRANSPORTE DE PASSAGEIROS NO REGIME DE FRETAMENTO EXCLUSIVO</h1>
