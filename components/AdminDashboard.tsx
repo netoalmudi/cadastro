@@ -83,6 +83,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     fetchData();
   }, []);
 
+  // Helper para calcular idade
+  const calculateAge = (birthDate: string | undefined) => {
+    if (!birthDate) return null;
+    
+    let dateObj: Date;
+    
+    // Check for DD/MM/YYYY format (from input mask manually stored as string)
+    if (birthDate.includes('/')) {
+        const [day, month, year] = birthDate.split('/');
+        dateObj = new Date(Number(year), Number(month) - 1, Number(day));
+    } else {
+        // Assume ISO YYYY-MM-DD (standard DB date)
+        dateObj = new Date(birthDate);
+    }
+    
+    if (isNaN(dateObj.getTime())) return null;
+
+    const today = new Date();
+    let age = today.getFullYear() - dateObj.getFullYear();
+    const monthDiff = today.getMonth() - dateObj.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateObj.getDate())) {
+        age--;
+    }
+    
+    return age;
+  };
+
   // --- Handlers for Clients ---
   const handleDeleteClient = async (id: number | string) => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -273,32 +301,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Protocolo</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Idade</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
                                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {filteredClients.map((client) => (
-                                            <tr key={client.id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-mono font-medium text-primary">{client.protocolo}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">{client.nome} {client.sobrenome}</div>
-                                                    <div className="text-sm text-gray-500">{client.cpf}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm text-gray-900">{client.celular}</div>
-                                                    <div className="text-sm text-gray-500 truncate max-w-[150px]">{client.email}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                    <button onClick={() => handleEditClient(client)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Pencil size={18} /></button>
-                                                    <button onClick={() => handleDeleteClient(client.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {filteredClients.map((client) => {
+                                            const age = calculateAge(client.dataNascimento);
+                                            const isSenior = age !== null && age >= 60;
+                                            return (
+                                                <tr key={client.id} className="hover:bg-gray-50">
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className={`text-sm font-medium ${isSenior ? 'text-orange-600' : 'text-gray-900'}`}>
+                                                            {age !== null ? `${age} anos` : '-'}
+                                                            {isSenior && (
+                                                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                                                                    60+
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="text-sm font-medium text-gray-900">{client.nome} {client.sobrenome}</div>
+                                                        <div className="text-sm text-gray-500">{client.cpf}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="text-sm text-gray-900">{client.celular}</div>
+                                                        <div className="text-sm text-gray-500 truncate max-w-[150px]">{client.email}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                        <button onClick={() => handleEditClient(client)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Pencil size={18} /></button>
+                                                        <button onClick={() => handleDeleteClient(client.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
