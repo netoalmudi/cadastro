@@ -1,30 +1,42 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Função para obter variáveis de ambiente de forma segura
-const getEnv = (key: string) => {
-  // Verifica se import.meta.env existe (Padrão Vite)
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return import.meta.env[key];
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Validation Logic
+const isUrlValid = supabaseUrl && supabaseUrl.startsWith('https://');
+const isKeyValid = supabaseKey && supabaseKey.length > 20; // Basic length check for JWT/Key
+
+let client: SupabaseClient | null = null;
+let error: string | null = null;
+let configured = false;
+
+// Determine state
+if (!supabaseUrl && !supabaseKey) {
+  // Case 1: Both missing -> Clean Demo Mode (No error message, just isSupabaseConfigured = false)
+  configured = false;
+} else if (!isUrlValid) {
+  // Case 2: URL exists but is invalid
+  error = "Erro de Configuração: 'VITE_SUPABASE_URL' deve ser uma URL válida começando com https://.";
+  configured = false;
+} else if (!isKeyValid) {
+  // Case 3: Key exists but is invalid/short
+  error = "Erro de Configuração: 'VITE_SUPABASE_ANON_KEY' parece inválida ou incompleta.";
+  configured = false;
+} else {
+  // Case 4: Valid Configuration
+  try {
+    client = createClient(supabaseUrl, supabaseKey);
+    configured = true;
+  } catch (e: any) {
+    error = `Erro Fatal Supabase: ${e.message}`;
+    configured = false;
   }
-  // Fallback seguro
-  return undefined;
-};
-
-const supabaseUrl = getEnv('VITE_SUPABASE_URL');
-const supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY');
-
-// Verifica se as credenciais são válidas (não são undefined e não são placeholders)
-const isValidUrl = supabaseUrl && supabaseUrl.startsWith('http');
-const isValidKey = supabaseKey && supabaseKey.length > 0 && supabaseKey !== 'COLE_SUA_ANON_KEY_DO_SUPABASE_AQUI';
-
-export const isSupabaseConfigured = !!(isValidUrl && isValidKey);
-
-// Se as chaves não existirem ou forem inválidas, avisamos que o app rodará em modo local.
-if (!isSupabaseConfigured) {
-  console.warn("Supabase não configurado corretamente. O app rodará em MODO DEMONSTRAÇÃO (sem salvar dados). Verifique o arquivo .env.");
 }
 
-// Cria o client se as chaves existirem, senão cria um mock que falhará nas requisições reais
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseKey)
-  : createClient('https://setup-missing.supabase.co', 'missing-key');
+export const configError = error;
+export const isSupabaseConfigured = configured;
+
+// We export null if not configured to prevent using a client with bad credentials.
+// Consumers must check isSupabaseConfigured or configError before using.
+export const supabase = client;

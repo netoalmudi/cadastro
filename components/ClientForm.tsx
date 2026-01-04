@@ -3,9 +3,9 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, CheckCircle, Loader2 } from 'lucide-react';
+import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
-import { supabase, isSupabaseConfigured } from '../db/database';
+import { supabase, isSupabaseConfigured, configError } from '../db/database';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -261,7 +261,7 @@ const ClientForm: React.FC = () => {
 
   // Função auxiliar para upload de arquivos
   const uploadFile = async (file: File, folder: string) => {
-    if (!isSupabaseConfigured) return null;
+    if (!isSupabaseConfigured || !supabase) return null;
 
     const fileExt = file.name.split('.').pop();
     // Nome único para evitar sobrescrita
@@ -286,6 +286,12 @@ const ClientForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Bloqueia envio se houver erro de configuração
+    if (configError) {
+      alert("Corrija os erros de configuração no arquivo .env antes de enviar.");
+      return;
+    }
+
     const newErrors: { [key: string]: string } = {};
     let isValid = true;
 
@@ -313,8 +319,8 @@ const ClientForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // MOCK: Se o Supabase não estiver configurado, simula o sucesso
-      if (!isSupabaseConfigured) {
+      // MOCK: Se o Supabase não estiver configurado (Modo Demo), simula o sucesso
+      if (!isSupabaseConfigured || !supabase) {
         await new Promise(resolve => setTimeout(resolve, 2000)); // Simula delay de rede
         console.group("Simulação de Envio (Sem Backend)");
         console.log("Dados do formulário:", formData);
@@ -402,14 +408,30 @@ const ClientForm: React.FC = () => {
         </div>
       </div>
 
-      {!isSupabaseConfigured && (
-        <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700">
-          <p className="font-bold">Modo de Demonstração</p>
-          <p className="text-sm">O banco de dados não está configurado. Os dados preenchidos serão apenas simulados e não serão salvos permanentemente.</p>
+      {/* ERROR BANNER (Invalid Config) */}
+      {configError && (
+        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3">
+          <XCircle className="w-6 h-6 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Erro de Configuração</p>
+            <p className="text-sm">{configError}</p>
+            <p className="text-xs mt-1 text-red-600">Verifique o arquivo <code>.env</code> na raiz do projeto.</p>
+          </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} noValidate>
+      {/* DEMO BANNER (Missing Config - Demo Mode) */}
+      {!isSupabaseConfigured && !configError && (
+        <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 flex items-start gap-3">
+          <AlertTriangle className="w-6 h-6 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Modo de Demonstração</p>
+            <p className="text-sm">O banco de dados não está configurado. Os dados preenchidos serão apenas simulados.</p>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate className={configError ? 'opacity-50 pointer-events-none' : ''}>
         
         {/* IDENTIFICAÇÃO */}
         <SectionHeader title="Identificação" />
@@ -508,10 +530,10 @@ const ClientForm: React.FC = () => {
         </div>
 
         <div className="flex justify-end pt-6 border-t border-gray-200 gap-4">
-            <button type="button" onClick={handleClear} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200" disabled={isSubmitting || !!processingFile}>
+            <button type="button" onClick={handleClear} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200" disabled={isSubmitting || !!processingFile || !!configError}>
               Limpar
             </button>
-            <button type="submit" className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting || !!processingFile}>
+            <button type="submit" className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting || !!processingFile || !!configError}>
               {isSubmitting ? 'Enviando...' : 'Enviar'}
             </button>
         </div>
