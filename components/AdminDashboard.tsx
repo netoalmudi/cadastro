@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip, AirGroup } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar, FileSignature } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
 import AirGroupForm from './AirGroupForm';
 import ReportsTab from './ReportsTab';
+import { formatCurrency, numberToExtenso } from '../utils/currencyUtils';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -148,6 +149,184 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const handleEditTrip = (trip: Trip) => {
     setEditingTrip(trip);
     setMode('form');
+  };
+
+  const handleGenerateContract = async (trip: Trip) => {
+    if (!trip.contratante_id) {
+      alert("Esta viagem não possui um Contratante definido. Edite a viagem e defina um Contratante (ícone de estrela na lista de passageiros).");
+      return;
+    }
+
+    if (!supabase) return;
+
+    // Buscar dados do contratante
+    const { data: clientData, error } = await supabase
+      .from('clientes')
+      .select('*')
+      .eq('id', trip.contratante_id)
+      .single();
+
+    if (error || !clientData) {
+      alert("Erro ao buscar dados do contratante.");
+      return;
+    }
+
+    const contractor: Client = {
+        ...clientData,
+        dataNascimento: clientData.data_nascimento || clientData.dataNascimento,
+        ufRg: clientData.uf_rg || clientData.ufRg,
+    };
+
+    // Calcular valores
+    const dias = Number(trip.dias_total) || 0;
+    const km = Number(trip.km_total) || 0;
+    const valDiaria = Number(trip.valor_diaria) || 0;
+    const valKm = Number(trip.valor_km) || 0;
+    const valGuia = Number(trip.valor_guia) || 0;
+    const totalGeral = (dias * valDiaria) + (km * valKm) + (dias * valGuia);
+
+    const valorExtenso = numberToExtenso(totalGeral);
+    
+    // Formatar datas
+    const dtIda = formatDateDisplay(trip.data_ida);
+    const dtVolta = formatDateDisplay(trip.data_volta);
+
+    const printWindow = window.open('', '', 'width=900,height=800');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Contrato - ${trip.nome_viagem}</title>
+          <style>
+            @page { margin: 20mm 20mm 20mm 20mm; size: A4; }
+            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.3; color: #000; padding: 0; margin: 0; }
+            .header-info { text-align: right; margin-bottom: 20px; font-size: 10pt; }
+            h1 { font-size: 12pt; font-weight: bold; text-align: center; margin-bottom: 30px; text-transform: uppercase; }
+            p { text-align: justify; margin-bottom: 12px; }
+            .uppercase { text-transform: uppercase; }
+            .bold { font-weight: bold; }
+            .signature-section { margin-top: 50px; display: flex; justify-content: space-between; gap: 20px; }
+            .signature-box { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px; font-size: 11pt; }
+            .footer-location { text-align: right; margin-top: 40px; margin-bottom: 40px; }
+            ul { margin: 0; padding-left: 20px; }
+            li { text-align: justify; margin-bottom: 5px; }
+          </style>
+        </head>
+        <body>
+          <div class="header-info">
+            Número: ${trip.id.toString().padStart(4, '0')}
+          </div>
+
+          <h1>CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE TRANSPORTE DE PASSAGEIROS NO REGIME DE FRETAMENTO EXCLUSIVO</h1>
+
+          <p>
+            <span class="bold">CONTRATADA:</span> DARIO ALMUDI NETO VIAGENS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ: 28.623.289/0001-14, Inscrição Estadual: 91077391-70, com sede na Rua Presidente Castelo Branco, 983, Jardim São João, Porecatu, estado do Paraná, CEP 86160-000, doravante denominada CONTRATADA;
+          </p>
+
+          <p>
+            <span class="bold">CONTRATANTE:</span> <span class="uppercase bold">${contractor.nome} ${contractor.sobrenome}</span>, RG: ${contractor.rg || 'N/I'} ${contractor.ufRg || ''} - CPF: ${contractor.cpf}, ENDEREÇO: ${contractor.endereco || ''}, N° ${contractor.numero || ''}, BAIRRO: ${contractor.bairro || ''}, CEP: ${contractor.cep || ''} - CIDADE: ${contractor.cidade || ''} - ESTADO: ${contractor.estado || ''}, doravante denominada CONTRATANTE;
+          </p>
+
+          <p>As partes acima qualificadas resolvem celebrar o presente Contrato de Prestação de Serviços de Transporte de Passageiros sob o Regime de Fretamento Turístico Exclusivo, o qual será regido pelas cláusulas e condições a seguir estabelecidas:</p>
+
+          <p>1. A CONTRATADA prestará à CONTRATANTE serviço de transporte de passageiros, sob o regime de fretamento turístico exclusivo, a ser realizado em MICRO-ÔNIBUS DE 9 lugares de placa QTM9F23 da marca Mercedez Benz modelo 416 Marticar de acordo com as características abaixo:</p>
+
+          <div style="margin-left: 20px;">
+            <p>1.1 Itinerário da viagem: <span class="uppercase bold">${trip.origem} X ${trip.destino}</span> – DATA DA SAÍDA: ${dtIda} HORA DA SAÍDA: ${trip.hora_ida || '___:___'} - DATA DO RETORNO: ${dtVolta} HORA DO RETORNO: ${trip.hora_volta || '___:___'}</p>
+            <p>1.2 Roteiro da viagem: ${trip.roteiro || 'Conforme combinado'}</p>
+            <p>1.3 Local de embarque: casas particulares de cada viajante.</p>
+          </div>
+
+          <p>2. DO PREÇO, DA CONDIÇÃO DE PAGAMENTO e DAS DESPESAS DE VIAGEM:</p>
+
+          <div style="margin-left: 20px;">
+            <p>2.1 Pela presente prestação de serviços de fretamento ora contratado, o CONTRATANTE pagará à CONTRATADA a importância de <span class="bold">${formatCurrency(totalGeral)} (${valorExtenso})</span>. O valor corresponde o roteiro descrito em anexo, no qual já consta a franquia extra de translado.</p>
+            <p>2.2 A importância descrita no item 2.1, será quitada da seguinte forma pela CONTRATANTE: Forma/Condição Pagto: Depósito a vista com vencimento em: ${dtIda} Valor: <span class="bold">${formatCurrency(totalGeral)} (${valorExtenso})</span></p>
+            <p>2.3 Em ocorrendo por parte da CONTRATANTE: a) descumprimento do “Item 2.2”; e b) não devolução do contrato assinado em até quatro dias após a data da emissão, que se dará sempre na data do encaminhamento – considera-se rescindido o presente contrato sem a necessidade de qualquer aviso ao contratante e sem prejuízo do “Item 2.4”</p>
+            <p>2.4 Se após o pagamento estipulado no item 2.2 “a”, ocorrer: cancelamento, adiantamento da viagem, ausência de documentos por parte do contratante, ou outro fato que venha impedir a autorização de viagem pelo órgão competente, o valor que trata o item 2.2 “a” não será devolvido à Contratante, sendo o mesmo considerado como ressarcimento de despesas suportadas pela Contratada por tornar o veículo indisponível para demais fretamentos.</p>
+            <p>2.5 Independentemente do valor estipulado na cláusula 2.1, ficará a cargo da CONTRATANTE as despesas com alimentação e hospedagem do(s) motorista(s) durante o período de prestação de serviços, bem como taxas turísticas e despesas com estacionamento do veículo.</p>
+            <p>2.6 Havendo alteração do roteiro por parte do contratante, além do valor acima estipulado, o contratante pagará à contratada o valor de 7 (nove reais) por Km que venha exceder ao roteiro, o que será aferido ao final da viagem, sendo que essa diferença deverá ser quitada no prazo de 15 dias, contados do término da viagem, ficando desde já autorizado a emissão de cobrança.</p>
+            <p>2.7 Se a duração da viagem ultrapassar o limite de dias aqui estipulados, por motivos alheios à vontade da contratada, o contratante deverá pagar diárias, no valor de 500,00 (quinhentos reais) sem prejuízo da cobrança da quilometragem excedente;</p>
+            <p>2.8 O pagamento fora dos prazos estabelecidos nesse contrato acarretará a aplicação de correção monetária com base no INPC – IBGE, juros moratórios de 1% (um por cento) ao mês, multa de 2% (dois por cento) sobre o valor inadimplido, até a data do efetivo pagamento.</p>
+          </div>
+
+          <p>3. OBRIGAÇÃO DA CONTRATADA:</p>
+          <div style="margin-left: 20px;">
+            <p>3.1 Compromete-se a realizar a viagem nos horários e dias previstos;</p>
+            <p>3.2 Fornecer o veículo em conformidade atendendo a todas as exigências de ordem legal;</p>
+            <p>3.3 Arcar com todas as despesas de mão-de-obra, lubrificantes, peças e manutenção necessários à execução dos serviços objeto deste instrumento;</p>
+            <p>3.4 Manter seguro de danos pessoais, previsto no Código Nacional de Trânsito;</p>
+            <p>3.5 Substituir no prazo determinado pela Resolução 1166/2002 ANTT o micro-ônibus que não apresente condições de transporte, por avaria mecânica ou qualquer outro motivo, onde quer que estes se encontrem, prosseguindo na condução das pessoas transportadas;</p>
+            <p>3.6 Fornecer condutores devidamente capacitados e habilitados que observem rigorosamente as disposições legais e regulamentares no que se refere à condução do ônibus, bem como trajados e identificados, e em condições de higiene pessoal;</p>
+            <p>3.7 Responsabilizar-se pelo registro e habilitação dos seus contratados para o serviço, respondendo exclusivamente pelo micro-ônibus e encargos decorrentes dos contratos de trabalho, por toda e qualquer ação trabalhista e/ou indenizatória, bem como por eventuais autuações/multas por parte de órgãos fiscalizadores, quando estas se derem por sua culpa exclusiva;</p>
+            <p>3.8 O embarque será realizado no local indicado pelo contrato, desde que os acessos estejam em perfeitas condições de tráfego e segurança para passageiros e tripulação;</p>
+            <p>3.9 Conduzir o veículo, respeitando a legislação e as determinações das autoridades de trânsito.</p>
+          </div>
+
+          <p>4. OBRIGAÇÕES DA CONTRATANTE:</p>
+          <div style="margin-left: 20px;">
+            <p>4.1 Apresentar a lista de passageiros, até 5 (cinco) dias uteis anteriores a partida, sob pena de cancelamento da viagem sem direito a restituição do sinal pago conforme item 2.3;</p>
+            <p>4.2 Instruir os passageiros quanto aos documentos de identificação exigidos na hora do embarque, de acordo com a Resolução 4.308/2014 da ANTT, cujo conteúdo o CONTRATANTE declara ter tomado ciência neste ato;</p>
+            <p>4.3 Em especial, quando se tratar de viagem de menores: a) Crianças de colo - até 06 anos incompletos, documento: Certidão de Nascimento; b) Crianças até 12 anos incompletos, documento: CN ou RG; c) Adolescentes de 12 a 18 anos incompletos, documento de identificação: RG;</p>
+            <p>4.4 Na lista de passageiros deverão constar os nomes completos, nº do RG ou Passaporte. Em caso de dados incorretos ou omissão de nomes o CONTRATANTE é responsável pelas multas que porventura venham a ocorrer;</p>
+            <p>4.5 Contratar o GUIA de TURISMO devidamente credenciado pela CADASTUR para a viagem durante a execução do serviço de deslocamento, o qual compromete-se a zelar pelo bom andamento da viagem;</p>
+            <p>4.6 Diligenciar para que todos os passageiros, enquanto em viagem, utilizem cinto de segurança;</p>
+            <p>4.7 Reunir todos os passageiros nos locais e horários estabelecidos;</p>
+            <p>4.8 Respeitar todas as normas relativas à viagem estabelecidas pela CONTRATANTE;</p>
+            <p>4.9 Correrão por conta do CONTRATANTE as despesas relativas a taxas turísticas, obtenção de alvarás e autorização do juizado de menores, estadias, refeições e outras mencionadas com os transportes e suas bagagens;</p>
+            <p>4.10 Não será permitido o transporte de passageiros em pé, bem como exceder a lotação oficial do veículo, obedecendo ao Decreto Federal nº 2521/98.</p>
+            <p>4.11 Não usar o veículo para outras finalidades que não a de transporte de passageiros;</p>
+            <p>4.12 Obter os alvarás e autorizações necessárias nas cidades onde a legislação exige;</p>
+            <p>4.13 Arcar com despesas de estacionamento, sendo que não o fazendo, responderá por todo e qualquer prejuízo decorrente da permanência do veículo, quando estacionado em via pública, bem como as demais consequências praticadas por terceiros e vândalos;</p>
+            <p>4.14 Solicitar, por escrito, qualquer alteração de data, horário e /ou endereço no mínimo 20 (vinte) dias antes da data da viagem, sendo que tais alterações serão avaliadas conforme disponibilidade da CONTRATADA podendo haver alterações no preço ora ajustado;</p>
+            <p>4.15 Reparar todos os danos e extravios ocorridos no veículo, causados pelo CONTRATANTE e/ou por passageiros.</p>
+          </div>
+
+          <p>5. DISPOSIÇÕES GERAIS</p>
+          <div style="margin-left: 20px;">
+            <p>5.1 O CONTRATANTE receberá o veículo em condições de funcionamento, conforme lista de vistorias, em caso de danos causados pelos passageiros, a Neto Almudi Viagens fica autorizada a executar em oficina de confiança todos os reparos que se façam necessários para restituir o estado anterior, correndo as despesas por conta do CONTRATANTE;</p>
+            <p>5.2 Na forma do artigo 30 do Decreto Federal 2521/98 será recusado o transporte de passageiros que não se identificar quando exigido; se encontre em estado de embriaguez; portar armas; demonstrar incontinência no comportamento; comprometer a segurança, o conforto ou a tranquilidade dos demais passageiros; fizer uso de produtos ilícitos ou proibidos por lei no interior do veículo;</p>
+            <p>5.3 A viagem poderá ser cancelada no dia previsto pelos seguintes motivos: fatos da natureza; contra ordem do poder disciplinar (EMBRATUR ANTT DER ou outro) e estradas sem condição de tráfego, falta de pagamento ou descumprimento das disposições contratuais;</p>
+            <p>5.4 O presente instrumento passará a ter validade, somente após a assinatura de ambas as partes, não caracterizando em hipótese alguma reserva de veículo quando ausente esta condição;</p>
+            <p>5.5 Será permitido o peso máximo de 30 quilos de bagagem por passageiro conforme resolução 1432/2002 ANTT Ultrapassando este limite, responderá o CONTRATANTE pelas multas por excesso de peso, todas as bagagens deverão ser etiquetadas;</p>
+            <p>5.6 A CONTRATADA não se responsabilizará pela ausência da CONTRATANTE e seus passageiros nos locais de embarque nos horários estabelecidos;</p>
+            <p>5.7 Qualquer tolerância ou omissão em exigir o estrito cumprimento de quaisquer das Clausulas ou condições deste contrato, ou exercer direito delas decorrentes, não constituirá renuncias às mesmas, e não prejudicará a faculdade das partes em exigi-las ou exercê-las a qualquer tempo;</p>
+            <p>5.8 Este contrato não estabelece vínculo de qualquer natureza nem envolve responsabilidade solidária e/ou subsidiária entre as partes, bem como seus funcionários ou prepostos, sujeitando-se apenas ao pactuado neste instrumento;</p>
+          </div>
+
+          <p>6. NETO ALMUDI VIAGENS NÃO SE RESPONSABILIZA:</p>
+          <div style="margin-left: 20px;">
+            <p>6.1 Por extravios de volumes ou valores que sejam deixados pelos passageiros ou no interior do veículo;</p>
+            <p>6.2 Por danos que venham a ocorrer aos passageiros por atraso que se verifica na chegada ao destino ou retorno;</p>
+            <p>6.3 Pela relação jurídica existente entre o contratante e os passageiros;</p>
+            <p>6.4 Fica eleito o foro da comarca de Porecatu, Estado do Paraná, para nele serem dirimidas todas as questões decorrentes deste contrato, renunciando a contratante, expressamente, a qualquer outro por mais privilegiado que seja.</p>
+          </div>
+
+          <p>E por estarem justas e contratadas, firmam o presente em duas vias de igual teor e forma.</p>
+
+          <div class="footer-location">
+             <span class="uppercase">PORECATU, ${new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+          </div>
+
+          <div class="signature-section">
+            <div class="signature-box">
+              DARIO ALMUDI NETO VIAGENS LTDA<br>
+              <span style="font-size: 10pt; color: #888;">(Contratada)</span>
+            </div>
+            <div class="signature-box">
+              <span class="uppercase">${contractor.nome} ${contractor.sobrenome}</span><br>
+              <span style="font-size: 10pt; color: #888;">(Contratante)</span>
+            </div>
+          </div>
+          
+          <script>
+            setTimeout(() => { window.print(); window.close(); }, 800);
+          ` + '<' + '/script>' + `
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   // --- Handlers for Air Groups ---
@@ -603,6 +782,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                     </div>
 
                                     <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-gray-200/50">
+                                         <button 
+                                            onClick={() => handleGenerateContract(trip)}
+                                            className="flex-1 md:flex-none px-4 py-2 bg-white text-blue-700 border border-blue-200 rounded-md hover:bg-blue-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                            title="Gerar Contrato de Viagem"
+                                         >
+                                            <FileSignature size={16} /> Contrato
+                                         </button>
+
                                          <button onClick={() => handleEditTrip(trip)} className="flex-1 md:flex-none px-4 py-2 bg-white/50 border border-gray-300 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-medium flex items-center justify-center gap-2">
                                             <Pencil size={16} /> Editar
                                          </button>
