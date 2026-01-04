@@ -3,7 +3,7 @@ import { supabase } from '../db/database';
 import { Trip, Client } from '../types';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
-import { ArrowLeft, Save, Calendar, Clock, MapPin, Users, Search, X, Plus, Trash2, Check } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, Clock, MapPin, Users, Search, X, Plus, Trash2, Check, DollarSign, Calculator } from 'lucide-react';
 
 interface TripFormProps {
   initialData?: Trip | null;
@@ -24,6 +24,9 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
     roteiro: '',
     km_total: '',
     dias_total: '',
+    valor_diaria: '',
+    valor_km: '',
+    valor_guia: '',
   });
 
   // Alterado para aceitar string (UUID) ou number
@@ -58,6 +61,9 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
         roteiro: initialData.roteiro,
         km_total: initialData.km_total,
         dias_total: initialData.dias_total,
+        valor_diaria: initialData.valor_diaria || '',
+        valor_km: initialData.valor_km || '',
+        valor_guia: initialData.valor_guia || '',
       });
       fetchTripClients(initialData.id);
     }
@@ -189,6 +195,24 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
   // Obtém os objetos completos dos clientes selecionados para exibir na lista
   const selectedClientsList = availableClients.filter(c => selectedClientIds.includes(c.id));
 
+  // --- LÓGICA DE CÁLCULO DE CUSTOS ---
+  const dias = Number(formData.dias_total) || 0;
+  const km = Number(formData.km_total) || 0;
+  
+  const valDiaria = Number(formData.valor_diaria) || 0;
+  const valKm = Number(formData.valor_km) || 0;
+  const valGuia = Number(formData.valor_guia) || 0;
+
+  const calcTotalDiaria = dias * valDiaria;
+  const calcTotalKm = km * valKm;
+  const calcTotalGuia = dias * valGuia;
+  
+  const totalGeral = calcTotalDiaria + calcTotalKm + calcTotalGuia;
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
   return (
     <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-6">
@@ -240,6 +264,87 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
           <div className="md:col-span-4 mt-2">
              <span className="text-sm font-medium text-gray-600">Duração Calculada: </span>
              <span className="text-sm font-bold text-primary">{formData.dias_total || 0} dias</span>
+          </div>
+        </div>
+
+        {/* CUSTOS E ORÇAMENTO */}
+        <SectionHeader title="Custos e Orçamento" />
+        <div className="bg-blue-50 p-6 rounded-lg border border-blue-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            
+            {/* Linha 1: Diária do Veículo */}
+            <div className="flex flex-col md:flex-row items-start md:items-end gap-3">
+              <div className="w-full md:w-1/2">
+                <Input 
+                   label="Valor Diária (Veículo)" 
+                   name="valor_diaria" 
+                   type="number" 
+                   step="0.01"
+                   value={formData.valor_diaria} 
+                   onChange={handleChange} 
+                   placeholder="0,00" 
+                />
+              </div>
+              <div className="flex flex-col pb-2 w-full md:w-1/2">
+                <span className="text-xs text-gray-500 mb-1">Total Diárias ({dias} dias)</span>
+                <div className="font-mono font-medium text-gray-800 text-lg border-b border-gray-300 pb-1 flex items-center gap-2">
+                  <Calculator size={14} className="text-gray-400" />
+                  {formatCurrency(calcTotalDiaria)}
+                </div>
+              </div>
+            </div>
+
+            {/* Linha 2: KM Rodado */}
+            <div className="flex flex-col md:flex-row items-start md:items-end gap-3">
+              <div className="w-full md:w-1/2">
+                <Input 
+                   label="Valor por KM" 
+                   name="valor_km" 
+                   type="number" 
+                   step="0.01"
+                   value={formData.valor_km} 
+                   onChange={handleChange} 
+                   placeholder="0,00" 
+                />
+              </div>
+              <div className="flex flex-col pb-2 w-full md:w-1/2">
+                <span className="text-xs text-gray-500 mb-1">Total KM ({km} km)</span>
+                <div className="font-mono font-medium text-gray-800 text-lg border-b border-gray-300 pb-1 flex items-center gap-2">
+                  <Calculator size={14} className="text-gray-400" />
+                  {formatCurrency(calcTotalKm)}
+                </div>
+              </div>
+            </div>
+
+            {/* Linha 3: Diária Guia */}
+            <div className="flex flex-col md:flex-row items-start md:items-end gap-3">
+              <div className="w-full md:w-1/2">
+                <Input 
+                   label="Valor Diária (Guia)" 
+                   name="valor_guia" 
+                   type="number" 
+                   step="0.01"
+                   value={formData.valor_guia} 
+                   onChange={handleChange} 
+                   placeholder="0,00" 
+                />
+              </div>
+              <div className="flex flex-col pb-2 w-full md:w-1/2">
+                <span className="text-xs text-gray-500 mb-1">Total Guia ({dias} dias)</span>
+                <div className="font-mono font-medium text-gray-800 text-lg border-b border-gray-300 pb-1 flex items-center gap-2">
+                  <Calculator size={14} className="text-gray-400" />
+                  {formatCurrency(calcTotalGuia)}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Total Geral */}
+          <div className="mt-8 pt-4 border-t-2 border-blue-200 flex flex-col md:flex-row justify-between items-center">
+            <span className="text-lg font-bold text-blue-900 uppercase tracking-wide">Orçamento Estimado</span>
+            <div className="text-3xl font-bold text-blue-700 bg-white px-6 py-2 rounded shadow-sm border border-blue-100 flex items-center gap-2 mt-2 md:mt-0">
+               <span className="text-lg text-gray-400">R$</span> {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </div>
         </div>
 

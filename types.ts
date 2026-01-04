@@ -52,6 +52,11 @@ export interface Trip {
   roteiro: string;
   km_total: number | string;
   dias_total: number | string;
+  
+  // Financeiro
+  valor_diaria?: number | string;
+  valor_km?: number | string;
+  valor_guia?: number | string;
 }
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
