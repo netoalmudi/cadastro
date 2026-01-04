@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip, AirGroup } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
 import AirGroupForm from './AirGroupForm';
@@ -250,7 +250,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           </table>
           <script>
             setTimeout(() => { window.print(); window.close(); }, 500);
-          </script>
+          ` + '<' + '/script>' + `
         </body>
       </html>
     `);
@@ -464,6 +464,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Idade</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documentos</th>
                                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                                         </tr>
                                     </thead>
@@ -490,6 +491,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="text-sm text-gray-900">{client.celular}</div>
                                                         <div className="text-sm text-gray-500 truncate max-w-[150px]">{client.email}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="flex gap-2">
+                                                            {client.rg_url && (
+                                                                <a 
+                                                                    href={client.rg_url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer" 
+                                                                    className="text-blue-600 hover:text-blue-800 transition-colors p-1 hover:bg-blue-50 rounded"
+                                                                    title="Visualizar RG/CNH"
+                                                                >
+                                                                    <CreditCard size={20} />
+                                                                </a>
+                                                            )}
+                                                            {client.passaporte_url && (
+                                                                <a 
+                                                                    href={client.passaporte_url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer" 
+                                                                    className="text-green-600 hover:text-green-800 transition-colors p-1 hover:bg-green-50 rounded"
+                                                                    title="Visualizar Passaporte"
+                                                                >
+                                                                    <Globe size={20} />
+                                                                </a>
+                                                            )}
+                                                            {!client.rg_url && !client.passaporte_url && (
+                                                                <span className="text-gray-300 text-xs">-</span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                         <div className="flex justify-end items-center gap-3">

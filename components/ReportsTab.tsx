@@ -136,7 +136,7 @@ const ReportsTab: React.FC = () => {
               window.print();
               window.close();
             }, 500);
-          </script>
+          ` + '<' + '/script>' + `
         </body>
       </html>
     `);
