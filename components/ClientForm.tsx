@@ -1,38 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle } from 'lucide-react';
+import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle, ArrowLeft } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
 import { supabase, isSupabaseConfigured, configError } from '../db/database';
-
-// Interface para o estado do formulário
-interface ClientFormState {
-  nome: string;
-  sobrenome: string;
-  dataNascimento: string;
-  sexo: string;
-  cpf: string;
-  rg: string;
-  ufRg: string;
-  passaporte: string;
-  cep: string;
-  endereco: string;
-  numero: string;
-  bairro: string;
-  complemento: string;
-  cidade: string;
-  estado: string;
-  pais: string;
-  celular: string;
-  email: string;
-  observacoes: string;
-  assinatura: string | null;
-  // Campos de arquivo (apenas armazenados no estado local por enquanto)
-  arquivoRg: File | null;
-  arquivoPassaporte: File | null;
-}
+import { Client, ClientFormData } from '../types';
 
 // Interface para resposta do ViaCEP
 interface ViaCepResponse {
@@ -49,7 +23,14 @@ interface ViaCepResponse {
   erro?: boolean;
 }
 
-const ClientForm: React.FC = () => {
+interface ClientFormProps {
+  initialData?: Client | null;
+  onSuccess?: () => void;
+  onCancel?: () => void;
+  isAdmin?: boolean;
+}
+
+const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCancel, isAdmin = false }) => {
   // Gera o protocolo visualmente: YYYYMM-XXXX
   const generateProtocol = () => {
     const now = new Date();
@@ -59,7 +40,7 @@ const ClientForm: React.FC = () => {
     return `${year}${month}-${random}`;
   };
 
-  const [protocolNumber, setProtocolNumber] = useState(generateProtocol());
+  const [protocolNumber, setProtocolNumber] = useState(initialData?.protocolo || generateProtocol());
 
   // Estado para controlar a re-renderização do SignaturePad ao limpar
   const [signatureKey, setSignatureKey] = useState(0);
@@ -93,9 +74,34 @@ const ClientForm: React.FC = () => {
     arquivoPassaporte: null,
   };
 
-  const [formData, setFormData] = useState<ClientFormState>(initialFormData);
+  interface ClientFormState extends ClientFormData {
+    arquivoRg: File | null;
+    arquivoPassaporte: File | null;
+  }
+
+  // Se houver initialData (Modo Edição), popula o form
+  const getInitialState = (): ClientFormState => {
+    if (initialData) {
+      return {
+        ...initialFormData, // Defaults
+        ...initialData, // Database values
+        arquivoRg: null, // Files reset on edit unless re-uploaded
+        arquivoPassaporte: null
+      };
+    }
+    return initialFormData;
+  };
+
+  const [formData, setFormData] = useState<ClientFormState>(getInitialState);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [loadingAddress, setLoadingAddress] = useState(false);
+
+  // Reinicia o form se mudar de "Novo" para "Editar" ou vice-versa
+  useEffect(() => {
+    setFormData(getInitialState());
+    setProtocolNumber(initialData?.protocolo || generateProtocol());
+    setSignatureKey(prev => prev + 1);
+  }, [initialData]);
 
   // --- Validações e Formatações ---
 
@@ -249,7 +255,8 @@ const ClientForm: React.FC = () => {
     setFormData(initialFormData);
     setErrors({});
     setSignatureKey(prev => prev + 1);
-    setProtocolNumber(generateProtocol());
+    const newProtocol = generateProtocol();
+    setProtocolNumber(newProtocol);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -322,20 +329,19 @@ const ClientForm: React.FC = () => {
       // MOCK: Se o Supabase não estiver configurado (Modo Demo), simula o sucesso
       if (!isSupabaseConfigured || !supabase) {
         await new Promise(resolve => setTimeout(resolve, 2000)); // Simula delay de rede
-        console.group("Simulação de Envio (Sem Backend)");
-        console.log("Dados do formulário:", formData);
-        if (formData.arquivoRg) console.log("Arquivo RG:", formData.arquivoRg.name);
-        if (formData.arquivoPassaporte) console.log("Arquivo Passaporte:", formData.arquivoPassaporte.name);
-        console.groupEnd();
-
-        alert(`[MODO DEMONSTRAÇÃO]\nCadastro realizado com sucesso! \nProtocolo: ${protocolNumber}\n\nNota: Configure o arquivo .env para salvar no banco de dados.`);
-        resetForm();
+        alert(`[MODO DEMONSTRAÇÃO]\nCadastro ${initialData ? 'atualizado' : 'realizado'} com sucesso!`);
+        if (onSuccess) onSuccess();
+        else resetForm();
         return;
       }
 
-      // 1. Upload das Imagens (se existirem)
-      let rgUrl = null;
-      let passaporteUrl = null;
+      // 1. Upload das Imagens (apenas se novas imagens foram selecionadas)
+      // Se estamos editando e não mudamos a imagem, mantemos a URL antiga (que não temos no formState, mas o backend não deve ser sobrescrito se null)
+      // Porém, o Supabase update sobrescreve se passarmos null? Não, mas precisamos passar o valor antigo se quisermos manter.
+      // Estratégia: Se file é null, não enviamos o campo para update, OU enviamos a URL antiga se tivermos.
+      
+      let rgUrl = initialData?.rg_url || null;
+      let passaporteUrl = initialData?.passaporte_url || null;
 
       if (formData.arquivoRg) {
          rgUrl = await uploadFile(formData.arquivoRg, 'rg');
@@ -344,61 +350,88 @@ const ClientForm: React.FC = () => {
          passaporteUrl = await uploadFile(formData.arquivoPassaporte, 'passaporte');
       }
 
-      // 2. Inserção no Banco de Dados
-      // Mapeando do estado (camelCase) para o banco (snake_case) conforme tabela criada
-      const { error: insertError } = await supabase
-        .from('clientes')
-        .insert([
-          {
-            protocolo: protocolNumber,
-            nome: formData.nome,
-            sobrenome: formData.sobrenome,
-            data_nascimento: formData.dataNascimento,
-            sexo: formData.sexo,
-            cpf: formData.cpf,
-            rg: formData.rg,
-            uf_rg: formData.ufRg,
-            passaporte: formData.passaporte,
-            cep: formData.cep,
-            endereco: formData.endereco,
-            numero: formData.numero,
-            bairro: formData.bairro,
-            complemento: formData.complemento,
-            cidade: formData.cidade,
-            estado: formData.estado,
-            pais: formData.pais,
-            celular: formData.celular,
-            email: formData.email,
-            observacoes: formData.observacoes,
-            assinatura: formData.assinatura,
-            rg_url: rgUrl,
-            passaporte_url: passaporteUrl
-          }
-        ]);
+      // 2. Prepara payload
+      const payload = {
+        protocolo: protocolNumber,
+        nome: formData.nome,
+        sobrenome: formData.sobrenome,
+        data_nascimento: formData.dataNascimento,
+        sexo: formData.sexo,
+        cpf: formData.cpf,
+        rg: formData.rg,
+        uf_rg: formData.ufRg,
+        passaporte: formData.passaporte,
+        cep: formData.cep,
+        endereco: formData.endereco,
+        numero: formData.numero,
+        bairro: formData.bairro,
+        complemento: formData.complemento,
+        cidade: formData.cidade,
+        estado: formData.estado,
+        pais: formData.pais,
+        celular: formData.celular,
+        email: formData.email,
+        observacoes: formData.observacoes,
+        assinatura: formData.assinatura,
+        rg_url: rgUrl,
+        passaporte_url: passaporteUrl
+      };
 
-      if (insertError) throw insertError;
+      if (initialData && initialData.id) {
+        // UPDATE
+        const { error: updateError } = await supabase
+          .from('clientes')
+          .update(payload)
+          .eq('id', initialData.id);
 
-      alert(`Cadastro realizado com sucesso! Protocolo: ${protocolNumber}`);
-      resetForm();
+        if (updateError) throw updateError;
+        alert('Cadastro atualizado com sucesso!');
+      } else {
+        // INSERT
+        const { error: insertError } = await supabase
+          .from('clientes')
+          .insert([payload]);
+
+        if (insertError) throw insertError;
+        alert(`Cadastro realizado com sucesso! Protocolo: ${protocolNumber}`);
+      }
+
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        resetForm();
+      }
 
     } catch (error: any) {
       console.error("Erro ao enviar formulário:", error);
-      alert('Erro ao realizar cadastro: ' + (error.message || 'Ocorreu um erro inesperado.'));
+      alert('Erro ao realizar operação: ' + (error.message || 'Ocorreu um erro inesperado.'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white shadow-sm sm:rounded-lg border border-gray-100 mt-6 mb-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white shadow-sm sm:rounded-lg border border-gray-100 mt-6 mb-12 relative">
+      
+      {/* Botão de Voltar (Apenas Admin Mode) */}
+      {isAdmin && onCancel && (
+        <button 
+          onClick={onCancel}
+          className="absolute top-8 left-8 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+          title="Voltar"
+        >
+          <ArrowLeft size={24} />
+        </button>
+      )}
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center border-b-2 border-primary pb-6 mb-8 gap-4">
+      <div className={`flex flex-col md:flex-row justify-between items-center border-b-2 border-primary pb-6 mb-8 gap-4 ${isAdmin ? 'pl-12' : ''}`}>
         <div className="flex flex-col items-center md:items-start">
              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                Neto Almudi Viagens
+                {isAdmin ? 'Área Administrativa' : 'Neto Almudi Viagens'}
              </h1>
              <h2 className="text-lg sm:text-xl font-medium text-primary">
-                Cadastro de Cliente
+                {initialData ? 'Editar Cadastro' : 'Cadastro de Cliente'}
              </h2>
         </div>
         
@@ -469,49 +502,51 @@ const ClientForm: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row gap-4">
           {/* RG UPLOAD */}
-          <label htmlFor="arquivoRg" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoRg ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
+          <label htmlFor="arquivoRg" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoRg || initialData?.rg_url ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
             {processingFile === 'arquivoRg' ? (
               <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
             ) : formData.arquivoRg ? (
               <CheckCircle className="w-5 h-5 text-green-500" />
+            ) : initialData?.rg_url ? (
+              <CheckCircle className="w-5 h-5 text-green-600" />
             ) : (
               <Camera className="w-5 h-5 text-blue-500" />
             )}
             <div className="flex flex-col items-center sm:items-start z-10">
               <span className="text-sm font-medium">
                 {processingFile === 'arquivoRg' 
-                  ? 'Processando imagem...' 
+                  ? 'Processando...' 
                   : formData.arquivoRg 
-                    ? 'Arquivo RG Selecionado' 
-                    : 'Foto RG/CPF/CNH'}
+                    ? 'Novo Arquivo Selecionado' 
+                    : initialData?.rg_url 
+                      ? 'Arquivo já enviado (clique para alterar)'
+                      : 'Foto RG/CPF/CNH'}
               </span>
-              {formData.arquivoRg && !processingFile && (
-                <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoRg.name}</span>
-              )}
             </div>
             <input id="arquivoRg" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoRg')} onClick={(e) => (e.target as HTMLInputElement).value = ''} disabled={!!processingFile} />
           </label>
 
           {/* PASSAPORTE UPLOAD */}
-          <label htmlFor="arquivoPassaporte" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoPassaporte ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
+          <label htmlFor="arquivoPassaporte" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoPassaporte || initialData?.passaporte_url ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
             {processingFile === 'arquivoPassaporte' ? (
               <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
             ) : formData.arquivoPassaporte ? (
               <CheckCircle className="w-5 h-5 text-green-500" />
+            ) : initialData?.passaporte_url ? (
+               <CheckCircle className="w-5 h-5 text-green-600" />
             ) : (
               <Upload className="w-5 h-5 text-blue-500" />
             )}
             <div className="flex flex-col items-center sm:items-start z-10">
                <span className="text-sm font-medium">
                  {processingFile === 'arquivoPassaporte' 
-                   ? 'Processando imagem...' 
+                   ? 'Processando...' 
                    : formData.arquivoPassaporte 
-                     ? 'Arquivo Passaporte Selecionado' 
-                     : 'Foto Passaporte'}
+                     ? 'Novo Arquivo Selecionado' 
+                     : initialData?.passaporte_url 
+                       ? 'Arquivo já enviado (clique para alterar)'
+                       : 'Foto Passaporte'}
                </span>
-               {formData.arquivoPassaporte && !processingFile && (
-                 <span className="text-xs opacity-75 max-w-[200px] truncate">{formData.arquivoPassaporte.name}</span>
-               )}
             </div>
             <input id="arquivoPassaporte" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} onClick={(e) => (e.target as HTMLInputElement).value = ''} disabled={!!processingFile} />
           </label>
@@ -526,15 +561,31 @@ const ClientForm: React.FC = () => {
         {/* ASSINATURA DIGITAL */}
         <SectionHeader title="Assinatura Digital" />
         <div className="mb-8">
+            {initialData?.assinatura && !formData.assinatura ? (
+                <div className="border-2 border-dashed border-gray-300 rounded p-4 text-center bg-gray-50 mb-4">
+                    <p className="text-sm text-gray-500 mb-2">Assinatura Atual:</p>
+                    <img src={initialData.assinatura} alt="Assinatura Cliente" className="h-16 mx-auto object-contain"/>
+                    <p className="text-xs text-gray-400 mt-2">Assine abaixo apenas se desejar substituir a assinatura atual.</p>
+                </div>
+            ) : null}
            <SignaturePad key={signatureKey} onEnd={handleSignature} />
         </div>
 
         <div className="flex justify-end pt-6 border-t border-gray-200 gap-4">
-            <button type="button" onClick={handleClear} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200" disabled={isSubmitting || !!processingFile || !!configError}>
-              Limpar
-            </button>
+            {onCancel && (
+              <button type="button" onClick={onCancel} className="bg-white hover:bg-gray-100 text-gray-700 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200" disabled={isSubmitting}>
+                Cancelar
+              </button>
+            )}
+            
+            {!onCancel && (
+              <button type="button" onClick={handleClear} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-8 rounded shadow-sm border border-gray-300 transition duration-200" disabled={isSubmitting || !!processingFile || !!configError}>
+                Limpar
+              </button>
+            )}
+
             <button type="submit" className="bg-primary hover:bg-blue-700 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isSubmitting || !!processingFile || !!configError}>
-              {isSubmitting ? 'Enviando...' : 'Enviar'}
+              {isSubmitting ? 'Salvando...' : initialData ? 'Atualizar Cadastro' : 'Enviar'}
             </button>
         </div>
 

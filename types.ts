@@ -30,6 +30,15 @@ export interface ClientFormData {
   assinatura: string | null; // Base64 string
 }
 
+// Extends FormData to include Database fields
+export interface Client extends ClientFormData {
+  id: number;
+  created_at: string;
+  protocolo: string;
+  rg_url?: string;
+  passaporte_url?: string;
+}
+
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   className?: string;
