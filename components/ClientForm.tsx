@@ -564,16 +564,31 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
 
       {/* Header */}
       <div className={`flex flex-col md:flex-row justify-between items-center border-b-2 border-primary pb-6 mb-8 gap-4 ${isAdmin ? 'pl-12' : ''}`}>
-        <div className="flex flex-col items-center md:items-start">
-             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                {isAdmin ? 'Área Administrativa' : 'Neto Almudi Viagens'}
-             </h1>
-             <h2 className="text-lg sm:text-xl font-medium text-primary">
-                {initialData ? 'Editar Cadastro' : 'Cadastro de Cliente'}
-             </h2>
+        
+        {/* LOGO E TÍTULOS - Layout Flex para alinhar Logo + Texto */}
+        <div className="flex flex-col md:flex-row items-center gap-5">
+            {/* Imagem da Logo - Espera arquivo logo.png na pasta public */}
+            <img 
+              src="/logo.png" 
+              alt="Logo Neto Almudi" 
+              className="h-20 w-auto object-contain"
+              onError={(e) => {
+                 // Oculta a imagem se o arquivo não existir (fallback silencioso)
+                 e.currentTarget.style.display = 'none';
+              }} 
+            />
+            
+            <div className="flex flex-col items-center md:items-start">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {isAdmin ? 'Área Administrativa' : 'Neto Almudi Viagens'}
+                </h1>
+                <h2 className="text-lg sm:text-xl font-medium text-primary">
+                    {initialData ? 'Editar Cadastro' : 'Cadastro de Cliente'}
+                </h2>
+            </div>
         </div>
         
-        <div className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200 shadow-sm">
+        <div className="bg-gray-100 px-4 py-2 rounded-full border border-gray-200 shadow-sm mt-2 md:mt-0">
           <span className="font-bold text-gray-800">Protocolo: </span>
           <span className="font-mono text-primary font-medium">{protocolNumber}</span>
         </div>
