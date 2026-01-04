@@ -41,7 +41,6 @@ const ReportsTab: React.FC = () => {
       if (tripError) throw tripError;
 
       // 2. Buscar passageiros (Join via tabela de junção)
-      // Nota: Supabase retorna os dados aninhados. Ex: { cliente_id: 1, clientes: { ...dados } }
       const { data: passengersData, error: passengersError } = await supabase
         .from('viagem_clientes')
         .select(`
@@ -52,11 +51,19 @@ const ReportsTab: React.FC = () => {
 
       if (passengersError) throw passengersError;
 
-      // Extrair e formatar os clientes
+      // Extrair, mapear e ordenar os clientes
       const passengers = (passengersData || [])
-        .map((item: any) => item.clientes)
-        .filter((client: any) => client !== null) // Remove nulos caso cliente tenha sido deletado mas a relação exista
-        .sort((a: any, b: any) => a.nome.localeCompare(b.nome)); // Ordem alfabética
+        .map((item: any) => {
+            const c = item.clientes;
+            // Mapeia snake_case (banco) para camelCase (interface)
+            return {
+                ...c,
+                dataNascimento: c.data_nascimento || c.dataNascimento,
+                ufRg: c.uf_rg || c.ufRg,
+            };
+        })
+        .filter((client: any) => client !== null)
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
 
       setReportData({
         trip: tripData as Trip,
@@ -75,6 +82,7 @@ const ReportsTab: React.FC = () => {
     if (!birthDate) return '';
     
     let dateObj: Date;
+    // Tenta formato BR (DD/MM/AAAA) ou ISO (AAAA-MM-DD)
     if (birthDate.includes('/')) {
         const [day, month, year] = birthDate.split('/');
         dateObj = new Date(Number(year), Number(month) - 1, Number(day));
@@ -109,13 +117,15 @@ const ReportsTab: React.FC = () => {
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
             @media print {
-              body { -webkit-print-color-adjust: exact; }
+              body { -webkit-print-color-adjust: exact; margin: 0; padding: 10px; }
               .no-print { display: none; }
+              @page { margin: 10mm; size: A4; }
             }
             body { font-family: sans-serif; padding: 20px; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f3f4f6; }
+            /* Fonte reduzida para 10px na impressão */
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; }
+            th { background-color: #f3f4f6; font-weight: bold; }
             .page-break { page-break-after: always; }
           </style>
         </head>
@@ -188,50 +198,49 @@ const ReportsTab: React.FC = () => {
 
           <div id="printable-report" className="bg-white p-8 shadow-lg border border-gray-200 rounded-none max-w-[210mm] mx-auto min-h-[297mm]">
             {/* CABEÇALHO DO RELATÓRIO */}
-            <div className="border-b-2 border-primary pb-4 mb-6">
+            <div className="border-b-2 border-primary pb-2 mb-4">
               <div className="flex justify-between items-start">
                 <div>
-                   <h1 className="text-2xl font-bold text-gray-900 uppercase">Lista de Passageiros</h1>
-                   <p className="text-sm text-gray-500">Neto Almudi Viagens</p>
+                   <h1 className="text-xl font-bold text-gray-900 uppercase">Lista de Passageiros</h1>
+                   <p className="text-xs text-gray-500">Neto Almudi Viagens</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-500">Data de Emissão</p>
-                  <p className="font-mono font-medium">{new Date().toLocaleString('pt-BR')}</p>
+                  <p className="text-[10px] text-gray-500">Emissão</p>
+                  <p className="font-mono text-xs font-medium">{new Date().toLocaleString('pt-BR')}</p>
                 </div>
               </div>
             </div>
 
             {/* DADOS DA VIAGEM */}
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 mb-6">
-              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Detalhes da Viagem</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4 text-xs">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <p className="text-xs text-gray-500">Viagem</p>
+                  <p className="text-[10px] text-gray-500 uppercase">Viagem</p>
                   <p className="font-semibold text-gray-900">{reportData.trip.nome_viagem}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Destino</p>
+                  <p className="text-[10px] text-gray-500 uppercase">Destino</p>
                   <p className="font-semibold text-gray-900 flex items-center gap-1">
-                    <MapPin size={12} /> {reportData.trip.destino}
+                    <MapPin size={10} /> {reportData.trip.destino}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Data Ida</p>
+                  <p className="text-[10px] text-gray-500 uppercase">Data Ida</p>
                   <p className="font-semibold text-gray-900 flex items-center gap-1">
-                    <Calendar size={12} /> {new Date(reportData.trip.data_ida).toLocaleDateString('pt-BR')} {reportData.trip.hora_ida}
+                    <Calendar size={10} /> {new Date(reportData.trip.data_ida).toLocaleDateString('pt-BR')} {reportData.trip.hora_ida}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Total Passageiros</p>
+                  <p className="text-[10px] text-gray-500 uppercase">Passageiros</p>
                   <p className="font-semibold text-primary flex items-center gap-1">
-                    <Users size={12} /> {reportData.passengers.length}
+                    <Users size={10} /> {reportData.passengers.length}
                   </p>
                 </div>
               </div>
               {/* Informação do Contratante, se houver */}
               {reportData.trip.contratante_id && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="text-xs text-gray-500">Contratante Responsável</p>
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <p className="text-[10px] text-gray-500 uppercase">Contratante Responsável</p>
                     <p className="font-bold text-gray-900">
                         {reportData.passengers.find(p => p.id === reportData.trip.contratante_id)?.nome} {reportData.passengers.find(p => p.id === reportData.trip.contratante_id)?.sobrenome}
                     </p>
@@ -242,42 +251,48 @@ const ReportsTab: React.FC = () => {
             {/* TABELA DE PASSAGEIROS */}
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-100 border-b border-gray-200 text-xs uppercase text-gray-600">
-                  <th className="py-2 px-2 font-bold w-10 text-center">#</th>
-                  <th className="py-2 px-2 font-bold">Nome Completo</th>
-                  <th className="py-2 px-2 font-bold">CPF</th>
-                  <th className="py-2 px-2 font-bold">RG</th>
-                  <th className="py-2 px-2 font-bold">Nascimento</th>
-                  <th className="py-2 px-2 font-bold text-center">Idade</th>
-                  <th className="py-2 px-2 font-bold text-center">Sexo</th>
-                  <th className="py-2 px-2 font-bold">Celular</th>
+                <tr className="bg-gray-100 border-b border-gray-200 text-[10px] uppercase text-gray-600">
+                  <th className="py-1 px-1 font-bold w-8 text-center">#</th>
+                  <th className="py-1 px-1 font-bold">Nome Completo</th>
+                  <th className="py-1 px-1 font-bold">CPF</th>
+                  <th className="py-1 px-1 font-bold">RG</th>
+                  <th className="py-1 px-1 font-bold text-center">Nascimento</th>
+                  <th className="py-1 px-1 font-bold text-center">Idade</th>
+                  <th className="py-1 px-1 font-bold text-center">Sexo</th>
+                  <th className="py-1 px-1 font-bold">Celular</th>
                 </tr>
               </thead>
-              <tbody className="text-sm text-gray-700 divide-y divide-gray-200">
+              <tbody className="text-[10px] text-gray-700 divide-y divide-gray-200">
                 {reportData.passengers.map((passenger, index) => {
                     const isContractor = reportData.trip.contratante_id === passenger.id;
+                    const birthDateFormatted = passenger.dataNascimento 
+                        ? (passenger.dataNascimento.includes('-') 
+                            ? new Date(passenger.dataNascimento).toLocaleDateString('pt-BR') 
+                            : passenger.dataNascimento)
+                        : '-';
+
                     return (
                         <tr key={passenger.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="py-2 px-2 text-center text-gray-500 text-xs">{index + 1}</td>
-                        <td className="py-2 px-2">
+                        <td className="py-1 px-1 text-center text-gray-500">{index + 1}</td>
+                        <td className="py-1 px-1">
                             <span className={isContractor ? "font-bold text-black" : ""}>
                                 {passenger.nome} {passenger.sobrenome}
                             </span>
-                            {isContractor && <span className="ml-1 text-[10px] text-gray-500">(Resp.)</span>}
+                            {isContractor && <span className="ml-1 text-[9px] text-gray-500 font-normal">(Resp.)</span>}
                         </td>
-                        <td className="py-2 px-2 font-mono text-xs">{passenger.cpf}</td>
-                        <td className="py-2 px-2 font-mono text-xs">{passenger.rg || '-'}</td>
-                        <td className="py-2 px-2 text-xs">{passenger.dataNascimento}</td>
-                        <td className="py-2 px-2 text-center text-xs">{calculateAge(passenger.dataNascimento)}</td>
-                        <td className="py-2 px-2 text-center text-xs">{passenger.sexo}</td>
-                        <td className="py-2 px-2 text-xs">{passenger.celular}</td>
+                        <td className="py-1 px-1 font-mono">{passenger.cpf}</td>
+                        <td className="py-1 px-1 font-mono">{passenger.rg || '-'}</td>
+                        <td className="py-1 px-1 text-center">{birthDateFormatted}</td>
+                        <td className="py-1 px-1 text-center">{calculateAge(passenger.dataNascimento)}</td>
+                        <td className="py-1 px-1 text-center">{passenger.sexo}</td>
+                        <td className="py-1 px-1">{passenger.celular}</td>
                         </tr>
                     );
                 })}
               </tbody>
             </table>
             
-            <div className="mt-8 pt-8 border-t border-gray-200 flex justify-between text-xs text-gray-400">
+            <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between text-[10px] text-gray-400">
                 <span>Relatório gerado pelo sistema Neto Almudi Viagens</span>
                 <span>Página 1 de 1</span>
             </div>
