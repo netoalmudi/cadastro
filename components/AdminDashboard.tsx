@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, FileText, User } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle } from 'lucide-react';
 import ClientForm from './ClientForm';
 
 interface AdminDashboardProps {
@@ -14,6 +14,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchClients = async () => {
     if (!isSupabaseConfigured || !supabase) {
@@ -22,18 +23,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from('clientes')
-      .select('*')
-      .order('created_at', { ascending: false });
+    setFetchError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Erro ao buscar clientes:", error);
-      alert("Erro ao buscar dados.");
-    } else {
-      setClients(data || []);
+      if (error) {
+        console.error("Erro ao buscar clientes:", error);
+        setFetchError("Erro ao conectar com o banco de dados. Verifique o console para mais detalhes.");
+      } else {
+        // Mapeamento dos campos do banco (snake_case) para a interface (camelCase)
+        // Isso é necessário porque o banco usa 'data_nascimento' e a aplicação 'dataNascimento'
+        const mappedData: Client[] = (data || []).map((item: any) => ({
+          ...item,
+          dataNascimento: item.data_nascimento || item.dataNascimento,
+          ufRg: item.uf_rg || item.ufRg,
+        }));
+        
+        setClients(mappedData);
+        console.log("Clientes carregados:", mappedData);
+      }
+    } catch (err: any) {
+      console.error("Exceção ao buscar clientes:", err);
+      setFetchError("Ocorreu um erro inesperado ao buscar os dados.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -47,7 +65,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       const { error } = await supabase.from('clientes').delete().eq('id', id);
       
       if (error) {
-        alert("Erro ao excluir cliente.");
+        alert("Erro ao excluir cliente: " + error.message);
       } else {
         setClients(prev => prev.filter(c => c.id !== id));
       }
@@ -76,10 +94,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   };
 
   const filteredClients = clients.filter(client => 
-    client.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.sobrenome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.cpf.includes(searchTerm) ||
-    client.protocolo.includes(searchTerm)
+    (client.nome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (client.sobrenome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (client.cpf || '').includes(searchTerm) ||
+    (client.protocolo || '').includes(searchTerm)
   );
 
   if (view === 'form') {
@@ -147,6 +165,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             </button>
         </div>
 
+        {/* Error Message */}
+        {fetchError && (
+             <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded shadow-sm">
+                <AlertCircle className="w-6 h-6 flex-shrink-0" />
+                <div>
+                    <p className="font-bold">Erro ao buscar dados</p>
+                    <p className="text-sm">{fetchError}</p>
+                </div>
+            </div>
+        )}
+
         {/* Table Content */}
         <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
             {loading ? (
@@ -155,7 +184,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 </div>
             ) : filteredClients.length === 0 ? (
                 <div className="p-12 text-center text-gray-500">
-                    {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum cliente cadastrado ainda."}
+                    <p className="text-lg font-medium text-gray-600 mb-2">
+                        {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum registro encontrado."}
+                    </p>
+                    
+                    {!searchTerm && !fetchError && (
+                        <div className="mt-6 max-w-lg mx-auto bg-blue-50 p-4 rounded-lg border border-blue-100 text-left">
+                            <p className="text-sm text-blue-800 font-bold mb-2 flex items-center gap-2">
+                                <AlertCircle size={16} />
+                                Dica de Solução de Problemas (Supabase):
+                            </p>
+                            <p className="text-sm text-blue-700 mb-2">
+                                Se você já cadastrou clientes mas eles não aparecem aqui, é provável que as 
+                                <strong> Políticas de Segurança (RLS)</strong> do seu banco de dados estejam bloqueando a leitura.
+                            </p>
+                            <ul className="list-disc list-inside text-xs text-blue-600 space-y-1">
+                                <li>Acesse o painel do Supabase {'>'} Table Editor {'>'} clientes.</li>
+                                <li>Verifique se há dados na tabela.</li>
+                                <li>Se houver dados, vá em Authentication {'>'} Policies.</li>
+                                <li>Adicione uma política para habilitar "SELECT" para o role "anon" ou "public".</li>
+                            </ul>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="overflow-x-auto">
@@ -181,7 +231,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center">
                                             <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                                                {client.nome.charAt(0)}{client.sobrenome.charAt(0)}
+                                                {client.nome ? client.nome.charAt(0) : '?'}{client.sobrenome ? client.sobrenome.charAt(0) : ''}
                                             </div>
                                             <div className="ml-4">
                                                 <div className="text-sm font-medium text-gray-900">{client.nome} {client.sobrenome}</div>
