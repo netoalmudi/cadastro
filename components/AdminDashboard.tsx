@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip, AirGroup } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
 import AirGroupForm from './AirGroupForm';
@@ -108,6 +108,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         age--;
     }
     return age;
+  };
+
+  const formatDateDisplay = (dateStr: string) => {
+    if (!dateStr) return '';
+    // Assume formato YYYY-MM-DD vindo do banco
+    if (dateStr.includes('-')) {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+    }
+    return dateStr;
   };
 
   // --- Handlers for Clients ---
@@ -576,6 +586,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                             <div className="flex items-center">
                                                 <Map size={16} className={`${isPast ? 'text-yellow-600' : 'text-green-600'} mr-1`} />
                                                 {trip.origem} <span className="mx-2 text-gray-300">➔</span> {trip.destino}
+                                            </div>
+                                            
+                                            <div className="flex items-center text-gray-500">
+                                                <Calendar size={16} className="mr-1.5" />
+                                                <span>{formatDateDisplay(trip.data_ida)}</span>
+                                                {trip.data_volta && (
+                                                    <>
+                                                        <span className="mx-2 text-gray-300">até</span>
+                                                        <span>{formatDateDisplay(trip.data_volta)}</span>
+                                                    </>
+                                                )}
                                             </div>
                                          </div>
                                     </div>
