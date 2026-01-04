@@ -221,11 +221,42 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
     setFormData(prev => ({ ...prev, [name as keyof ClientFormState]: newValue }));
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    
+    // Validação de CPF (Formato e Banco de Dados)
     if (name === 'cpf') {
-      if (value && !validateCPF(value)) setErrors(prev => ({ ...prev, cpf: 'CPF inválido.' }));
+      // 1. Validação de Formato
+      if (value && !validateCPF(value)) {
+        setErrors(prev => ({ ...prev, cpf: 'CPF inválido.' }));
+        return;
+      }
+
+      // 2. Validação de Duplicidade no Banco (Instantânea)
+      if (value && isSupabaseConfigured && supabase) {
+        try {
+          let query = supabase
+            .from('clientes')
+            .select('id', { count: 'exact', head: true })
+            .eq('cpf', value);
+
+          // Se estiver editando, exclui o próprio ID da verificação (para não dar erro no próprio cadastro)
+          if (initialData?.id) {
+            query = query.neq('id', initialData.id);
+          }
+
+          const { count, error } = await query;
+
+          if (!error && count !== null && count > 0) {
+             setErrors(prev => ({ ...prev, cpf: 'CPF já cadastrado.' }));
+             alert("Este CPF já consta em nosso banco de dados.\n\nPara alterações ou dúvidas, entre em contato com o número (41) 99813-6567 - Neto Almudi.");
+          }
+        } catch (err) {
+          console.error("Erro ao verificar CPF:", err);
+        }
+      }
     }
+
     if (name === 'cep') fetchAddressByCEP(value);
   };
 
@@ -305,6 +336,8 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
     // Validações básicas
     if (!formData.cpf) { newErrors.cpf = 'CPF é obrigatório.'; isValid = false; }
     else if (!validateCPF(formData.cpf)) { newErrors.cpf = 'CPF inválido.'; isValid = false; }
+    // Se o erro de duplicidade já foi setado no onBlur, ele persistirá aqui se o usuário não mudar o CPF
+    if (errors.cpf === 'CPF já cadastrado.') { isValid = false; }
 
     if (!formData.celular) { newErrors.celular = 'Celular é obrigatório.'; isValid = false; }
     else if (formData.celular.length < 14) { newErrors.celular = 'Celular incompleto.'; isValid = false; }
@@ -314,11 +347,19 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
 
     if (!isValid) {
       setErrors(prev => ({ ...prev, ...newErrors }));
-      const firstErrorField = Object.keys(newErrors)[0];
-      const element = document.getElementsByName(firstErrorField)[0];
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        element.focus();
+      
+      // Se já sabemos que o CPF é duplicado, mostramos o alerta novamente para garantir
+      if (errors.cpf === 'CPF já cadastrado.' || newErrors.cpf === 'CPF já cadastrado.') {
+         alert("Este CPF já consta em nosso banco de dados.\n\nPara alterações ou dúvidas, entre em contato com o número (41) 99813-6567 - Neto Almudi.");
+      }
+
+      const firstErrorField = Object.keys(newErrors)[0] || (errors.cpf ? 'cpf' : '');
+      if (firstErrorField) {
+        const element = document.getElementsByName(firstErrorField)[0];
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        }
       }
       return;
     }
@@ -335,47 +376,27 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         return;
       }
 
-      // ======================================================================
-      // VERIFICAÇÃO DE DUPLICIDADE DE CPF
-      // ======================================================================
+      // Revalidação final de duplicidade (segurança extra contra race conditions)
+      // ... (código existente de verificação mantido abaixo, apenas por segurança)
       let cpfQuery = supabase
         .from('clientes')
         .select('id', { count: 'exact', head: true })
         .eq('cpf', formData.cpf);
 
-      // Se estiver editando, exclui o próprio ID da verificação
       if (initialData?.id) {
         cpfQuery = cpfQuery.neq('id', initialData.id);
       }
 
       const { count, error: countError } = await cpfQuery;
 
-      if (countError) {
-        console.error("Erro ao verificar CPF:", countError);
-        // Não impede o fluxo por erro de conexão, mas loga. 
-        // Em sistemas críticos, poderia bloquear aqui.
-      } else if (count !== null && count > 0) {
-        // CPF JÁ EXISTE
+      if (!countError && count !== null && count > 0) {
         setIsSubmitting(false);
         setErrors(prev => ({ ...prev, cpf: 'CPF já cadastrado.' }));
-        
-        // Mensagem Personalizada Solicitada
         alert("Este CPF já consta em nosso banco de dados.\n\nPara alterações ou dúvidas, entre em contato com o número (41) 99813-6567 - Neto Almudi.");
-        
-        // Scroll para o campo
-        const cpfElement = document.getElementsByName('cpf')[0];
-        if (cpfElement) {
-            cpfElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            cpfElement.focus();
-        }
         return;
       }
-      // ======================================================================
-
-      // 1. Upload das Imagens (apenas se novas imagens foram selecionadas)
-      // Se estamos editando e não mudamos a imagem, mantemos a URL antiga (que não temos no formState, mas o backend não deve ser sobrescrito se null)
-      // Porém, o Supabase update sobrescreve se passarmos null? Não, mas precisamos passar o valor antigo se quisermos manter.
-      // Estratégia: Se file é null, não enviamos o campo para update, OU enviamos a URL antiga se tivermos.
+      
+      // ... Resto do código de upload e salvamento
       
       let rgUrl = initialData?.rg_url || null;
       let passaporteUrl = initialData?.passaporte_url || null;
@@ -387,7 +408,6 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
          passaporteUrl = await uploadFile(formData.arquivoPassaporte, 'passaporte');
       }
 
-      // 2. Prepara payload
       const payload = {
         protocolo: protocolNumber,
         nome: formData.nome,
@@ -415,7 +435,6 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
       };
 
       if (initialData && initialData.id) {
-        // UPDATE
         const { error: updateError } = await supabase
           .from('clientes')
           .update(payload)
@@ -424,7 +443,6 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         if (updateError) throw updateError;
         alert('Cadastro atualizado com sucesso!');
       } else {
-        // INSERT
         const { error: insertError } = await supabase
           .from('clientes')
           .insert([payload]);
