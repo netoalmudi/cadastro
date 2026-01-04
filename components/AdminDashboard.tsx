@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
-import { Client, Trip } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, Calendar, MapPin, FileImage, Plane, FileText, CheckCircle, Clock } from 'lucide-react';
+import { Client, Trip, AirGroup } from '../types';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
+import AirGroupForm from './AirGroupForm';
 import ReportsTab from './ReportsTab';
 
 interface AdminDashboardProps {
   onLogout: () => void;
 }
 
-type TabView = 'clients' | 'trips' | 'reports';
+type TabView = 'clients' | 'trips' | 'air' | 'reports';
 type EditMode = 'list' | 'form';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
@@ -21,6 +22,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // State for Trips
   const [trips, setTrips] = useState<Trip[]>([]);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+
+  // State for Air Groups
+  const [airGroups, setAirGroups] = useState<AirGroup[]>([]);
+  const [editingAirGroup, setEditingAirGroup] = useState<AirGroup | null>(null);
 
   // Common State
   const [activeTab, setActiveTab] = useState<TabView>('clients');
@@ -40,16 +45,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     
     try {
       // 1. Fetch Clients
-      // Alterado para ordenar por nome (alfabético) em vez de data de criação
       const { data: clientsData, error: clientsError } = await supabase
         .from('clientes')
         .select('*')
         .order('nome', { ascending: true })
-        .order('sobrenome', { ascending: true }); // Ordenação secundária pelo sobrenome
+        .order('sobrenome', { ascending: true });
 
       if (clientsError) throw clientsError;
 
-      // Map snake_case to camelCase for Clients
       const mappedClients: Client[] = (clientsData || []).map((item: any) => ({
         ...item,
         dataNascimento: item.data_nascimento || item.dataNascimento,
@@ -61,16 +64,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       const { data: tripsData, error: tripsError } = await supabase
         .from('viagens')
         .select('*')
-        .order('data_ida', { ascending: true }); // Ordena cronologicamente (antigas -> novas)
+        .order('data_ida', { ascending: true });
 
-      if (tripsError) {
-          // Se a tabela não existir, não quebra a tela de clientes, apenas loga
-          console.warn("Tabela de viagens pode não existir ainda.", tripsError);
-      }
+      if (tripsError) console.warn("Erro ao buscar viagens", tripsError);
+      if (tripsData) setTrips(tripsData as Trip[]);
 
-      if (tripsData) {
-        setTrips(tripsData as Trip[]);
-      }
+      // 3. Fetch Air Groups
+      const { data: airData, error: airError } = await supabase
+        .from('grupos_aereos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (airError) console.warn("Tabela grupos_aereos pode não existir.", airError);
+      if (airData) setAirGroups(airData as AirGroup[]);
 
     } catch (err: any) {
       console.error("Erro ao buscar dados:", err);
@@ -87,28 +93,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // Helper para calcular idade
   const calculateAge = (birthDate: string | undefined) => {
     if (!birthDate) return null;
-    
     let dateObj: Date;
-    
-    // Check for DD/MM/YYYY format (from input mask manually stored as string)
     if (birthDate.includes('/')) {
         const [day, month, year] = birthDate.split('/');
         dateObj = new Date(Number(year), Number(month) - 1, Number(day));
     } else {
-        // Assume ISO YYYY-MM-DD (standard DB date)
         dateObj = new Date(birthDate);
     }
-    
     if (isNaN(dateObj.getTime())) return null;
-
     const today = new Date();
     let age = today.getFullYear() - dateObj.getFullYear();
     const monthDiff = today.getMonth() - dateObj.getMonth();
-    
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateObj.getDate())) {
         age--;
     }
-    
     return age;
   };
 
@@ -142,37 +140,152 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     setMode('form');
   };
 
+  // --- Handlers for Air Groups ---
+  const handleDeleteAirGroup = async (id: number) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    if (window.confirm("Tem certeza que deseja excluir este grupo aéreo?")) {
+      const { error } = await supabase.from('grupos_aereos').delete().eq('id', id);
+      if (error) alert("Erro: " + error.message);
+      else setAirGroups(prev => prev.filter(g => g.id !== id));
+    }
+  };
+
+  const handleEditAirGroup = (group: AirGroup) => {
+    setEditingAirGroup(group);
+    setMode('form');
+  };
+
+  const generateAirReport = async (group: AirGroup) => {
+    if (!supabase) return;
+    
+    // Buscar passageiros
+    const { data: passengersData, error } = await supabase
+        .from('grupo_aereo_clientes')
+        .select(`
+          cliente_id,
+          clientes (*)
+        `)
+        .eq('grupo_id', group.id);
+
+    if (error) {
+        alert("Erro ao buscar passageiros.");
+        return;
+    }
+
+    const passengers = (passengersData || [])
+        .map((item: any) => item.clientes)
+        .sort((a: any, b: any) => a.sobrenome.localeCompare(b.sobrenome));
+
+    // Formatar data para impressão
+    const formatDate = (dateStr: string) => {
+        if (!dateStr) return '';
+        if (dateStr.includes('/')) return dateStr;
+        return new Date(dateStr).toLocaleDateString('pt-BR');
+    };
+
+    // Criar conteúdo HTML para impressão
+    const printWindow = window.open('', '', 'width=900,height=600');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Emissão Aérea - ${group.nome_grupo}</title>
+          <style>
+            @media print {
+              body { font-family: sans-serif; padding: 20px; font-size: 12px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
+              th { background-color: #eee; text-transform: uppercase; }
+              h1 { font-size: 18px; margin-bottom: 5px; }
+              .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+              .uppercase { text-transform: uppercase; }
+            }
+            body { font-family: sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background-color: #f0f0f0; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>LISTA PARA EMISSÃO DE BILHETES AÉREOS</h1>
+            <p><strong>GRUPO:</strong> ${group.nome_grupo}</p>
+            <p><strong>ROTEIRO:</strong> ${group.roteiro || 'N/D'}</p>
+            <p><strong>TOTAL PAX:</strong> ${passengers.length}</p>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>SOBRENOME</th>
+                <th>NOME</th>
+                <th>SEXO</th>
+                <th>CPF</th>
+                <th>PASSAPORTE</th>
+                <th>DATA NASC.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${passengers.map((p: any) => `
+                <tr>
+                  <td class="uppercase"><strong>${p.sobrenome}</strong></td>
+                  <td class="uppercase">${p.nome}</td>
+                  <td class="uppercase">${p.sexo}</td>
+                  <td>${p.cpf}</td>
+                  <td class="uppercase">${p.passaporte || '-'}</td>
+                  <td>${formatDate(p.data_nascimento || p.dataNascimento)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>
+            setTimeout(() => { window.print(); window.close(); }, 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+
   // --- Common Handlers ---
   const handleNew = () => {
     if (activeTab === 'clients') setEditingClient(null);
-    else setEditingTrip(null);
+    else if (activeTab === 'trips') setEditingTrip(null);
+    else if (activeTab === 'air') setEditingAirGroup(null);
     setMode('form');
   };
 
   const handleFormSuccess = () => {
-    fetchData(); // Reload all data to be fresh
+    fetchData();
     setMode('list');
     setEditingClient(null);
     setEditingTrip(null);
+    setEditingAirGroup(null);
   };
 
   const handleFormCancel = () => {
     setMode('list');
     setEditingClient(null);
     setEditingTrip(null);
+    setEditingAirGroup(null);
   };
 
   // --- Filtering ---
   const filteredClients = clients.filter(c => 
     (c.nome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
     (c.sobrenome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (c.cpf || '').includes(searchTerm) ||
-    (c.protocolo || '').includes(searchTerm)
+    (c.cpf || '').includes(searchTerm)
   );
 
   const filteredTrips = trips.filter(t => 
     (t.nome_viagem?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
     (t.destino?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  );
+
+  const filteredAirGroups = airGroups.filter(g =>
+    (g.nome_grupo?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   // --- Render Views ---
@@ -189,7 +302,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             />
         </div>
       );
-    } else {
+    } else if (activeTab === 'trips') {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 mt-6">
             <TripForm
@@ -200,6 +313,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             />
         </div>
       );
+    } else if (activeTab === 'air') {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8 mt-6">
+                <AirGroupForm
+                    initialData={editingAirGroup}
+                    availableClients={clients}
+                    onSuccess={handleFormSuccess}
+                    onCancel={handleFormCancel}
+                />
+            </div>
+        );
     }
   }
 
@@ -209,7 +333,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <div>
                 <h1 className="text-2xl font-bold text-gray-900">Painel Administrativo</h1>
-                <p className="text-gray-500">Gerencie clientes e viagens.</p>
+                <p className="text-gray-500">Gerencie clientes, viagens e grupos aéreos.</p>
             </div>
             <div className="flex gap-3">
                  <button 
@@ -224,7 +348,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
                   >
                       <Plus size={20} />
-                      {activeTab === 'clients' ? 'Novo Cliente' : 'Nova Viagem'}
+                      {activeTab === 'clients' ? 'Novo Cliente' : activeTab === 'trips' ? 'Nova Viagem' : 'Novo Grupo Aéreo'}
                   </button>
                 )}
             </div>
@@ -247,6 +371,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 Viagens
             </button>
             <button
+                onClick={() => { setActiveTab('air'); setSearchTerm(''); }}
+                className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'air' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+                <Plane size={18} />
+                Grupos Aéreos
+            </button>
+            <button
                 onClick={() => { setActiveTab('reports'); setSearchTerm(''); }}
                 className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'reports' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
@@ -262,7 +393,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                   <input 
                       type="text" 
-                      placeholder={activeTab === 'clients' ? "Buscar por Nome, CPF ou Protocolo..." : "Buscar por Viagem ou Destino..."}
+                      placeholder={
+                          activeTab === 'clients' ? "Buscar por Nome, CPF ou Protocolo..." : 
+                          activeTab === 'trips' ? "Buscar por Viagem ou Destino..." :
+                          "Buscar Grupo Aéreo..."
+                      }
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -348,22 +483,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                                         <div className="text-sm text-gray-500 truncate max-w-[150px]">{client.email}</div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <div className="flex justify-end items-center">
-                                                            {(client.rg_url || client.passaporte_url) && (
-                                                                <div className="flex gap-2 mr-3 border-r pr-3 border-gray-200">
-                                                                    {client.rg_url && (
-                                                                        <a href={client.rg_url} target="_blank" title="Ver RG" className="text-gray-400 hover:text-blue-600 transition-colors">
-                                                                            <FileImage size={18} />
-                                                                        </a>
-                                                                    )}
-                                                                    {client.passaporte_url && (
-                                                                        <a href={client.passaporte_url} target="_blank" title="Ver Passaporte" className="text-gray-400 hover:text-blue-600 transition-colors">
-                                                                            <Plane size={18} />
-                                                                        </a>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            <button onClick={() => handleEditClient(client)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Pencil size={18} /></button>
+                                                        <div className="flex justify-end items-center gap-3">
+                                                            <button onClick={() => handleEditClient(client)} className="text-indigo-600 hover:text-indigo-900"><Pencil size={18} /></button>
                                                             <button onClick={() => handleDeleteClient(client.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
                                                         </div>
                                                     </td>
@@ -378,7 +499,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 )}
 
                 {activeTab === 'trips' && (
-                    // TRIPS LIST (Vertical)
+                    // TRIPS LIST
                     <div className="space-y-4">
                         {filteredTrips.length === 0 ? (
                             <div className="bg-white p-12 text-center text-gray-500 rounded-lg border border-gray-200">
@@ -386,26 +507,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             </div>
                         ) : (
                             filteredTrips.map(trip => {
-                                // Lógica de Cores: Amarelo para passado, Verde para futuro
-                                const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
-                                const tripDateStr = trip.data_ida; // Já vem YYYY-MM-DD do banco
+                                const todayStr = new Date().toLocaleDateString('en-CA');
+                                const tripDateStr = trip.data_ida;
                                 const isPast = tripDateStr < todayStr;
                                 const isToday = tripDateStr === todayStr;
 
-                                // Base classes
                                 let containerClasses = "rounded-lg shadow-sm border hover:shadow-md transition-all p-5 flex flex-col md:flex-row items-start md:items-center gap-4";
                                 
                                 if (isPast) {
-                                    // Passado: Amarelo
                                     containerClasses += " bg-yellow-50 border-yellow-200";
                                 } else {
-                                    // Futuro ou Hoje: Verde
                                     containerClasses += " bg-green-50 border-green-200";
                                 }
 
                                 return (
                                 <div key={trip.id} className={containerClasses}>
-                                    {/* Left: Info */}
                                     <div className="flex-grow">
                                          <div className="flex items-center gap-2 mb-1">
                                             <h3 className="text-lg font-bold text-gray-900">{trip.nome_viagem}</h3>
@@ -417,48 +533,73 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                                 </span>
                                             )}
                                          </div>
-                                         
                                          <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-600">
                                             <div className="flex items-center">
-                                                <MapPin size={16} className={`${isPast ? 'text-yellow-600' : 'text-green-600'} mr-1`} />
+                                                <Map size={16} className={`${isPast ? 'text-yellow-600' : 'text-green-600'} mr-1`} />
                                                 {trip.origem} <span className="mx-2 text-gray-300">➔</span> {trip.destino}
                                             </div>
-                                            <div className="hidden md:block w-1 h-1 bg-gray-300 rounded-full"></div>
-                                            <div className="flex items-center">
-                                                <Calendar size={16} className={`${isPast ? 'text-yellow-600' : 'text-green-600'} mr-1`} />
-                                                {trip.data_ida ? new Date(trip.data_ida).toLocaleDateString('pt-BR') : '-'} 
-                                                {trip.data_volta && ` até ${new Date(trip.data_volta).toLocaleDateString('pt-BR')}`}
-                                            </div>
-                                         </div>
-
-                                         <div className="flex items-center gap-3 mt-3 text-xs font-medium text-gray-500">
-                                            <span className={`px-2 py-1 rounded border ${isPast ? 'bg-yellow-100 border-yellow-200 text-yellow-800' : 'bg-green-100 border-green-200 text-green-800'}`}>
-                                                {trip.dias_total} dias
-                                            </span>
-                                            <span className="bg-white text-gray-600 px-2 py-1 rounded border border-gray-200">
-                                                {trip.km_total} km
-                                            </span>
                                          </div>
                                     </div>
 
-                                    {/* Right: Actions */}
                                     <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-gray-200/50">
-                                         <button 
-                                            onClick={() => handleEditTrip(trip)}
-                                            className="flex-1 md:flex-none px-4 py-2 bg-white/50 border border-gray-300 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                                         >
+                                         <button onClick={() => handleEditTrip(trip)} className="flex-1 md:flex-none px-4 py-2 bg-white/50 border border-gray-300 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-medium flex items-center justify-center gap-2">
                                             <Pencil size={16} /> Editar
                                          </button>
-                                         <button 
-                                            onClick={() => handleDeleteTrip(trip.id)}
-                                            className="p-2 text-red-600 hover:bg-red-50/50 rounded-md transition-colors border border-transparent hover:border-red-100"
-                                            title="Excluir"
-                                         >
+                                         <button onClick={() => handleDeleteTrip(trip.id)} className="p-2 text-red-600 hover:bg-red-50/50 rounded-md transition-colors border border-transparent hover:border-red-100">
                                             <Trash2 size={18} />
                                          </button>
                                     </div>
                                 </div>
                             )})
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'air' && (
+                    // AIR GROUPS LIST
+                    <div className="space-y-4">
+                        {filteredAirGroups.length === 0 ? (
+                            <div className="bg-white p-12 text-center text-gray-500 rounded-lg border border-gray-200">
+                                Nenhum grupo aéreo encontrado. Clique em "Novo Grupo Aéreo" para começar.
+                            </div>
+                        ) : (
+                            filteredAirGroups.map(group => (
+                                <div key={group.id} className="rounded-lg shadow-sm border border-blue-200 bg-blue-50 hover:shadow-md transition-all p-5 flex flex-col md:flex-row items-start md:items-center gap-4">
+                                    <div className="flex-grow">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Plane className="text-primary" size={20} />
+                                            <h3 className="text-lg font-bold text-gray-900">{group.nome_grupo}</h3>
+                                        </div>
+                                        {group.roteiro && (
+                                            <p className="text-sm text-gray-600 line-clamp-2">{group.roteiro}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-blue-200/50">
+                                         <button 
+                                            onClick={() => generateAirReport(group)}
+                                            className="flex-1 md:flex-none px-4 py-2 bg-white text-green-700 border border-green-200 rounded-md hover:bg-green-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                            title="Gerar lista para companhia aérea"
+                                         >
+                                            <Printer size={16} /> Lista Aérea
+                                         </button>
+                                         
+                                         <button 
+                                            onClick={() => handleEditAirGroup(group)}
+                                            className="flex-1 md:flex-none px-4 py-2 bg-white/50 border border-gray-300 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                         >
+                                            <Pencil size={16} /> Editar
+                                         </button>
+                                         
+                                         <button 
+                                            onClick={() => handleDeleteAirGroup(group.id)}
+                                            className="p-2 text-red-600 hover:bg-red-50/50 rounded-md transition-colors border border-transparent hover:border-red-100"
+                                         >
+                                            <Trash2 size={18} />
+                                         </button>
+                                    </div>
+                                </div>
+                            ))
                         )}
                     </div>
                 )}

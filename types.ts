@@ -62,6 +62,13 @@ export interface Trip {
   contratante_id?: number | string | null;
 }
 
+export interface AirGroup {
+  id: number;
+  created_at?: string;
+  nome_grupo: string;
+  roteiro: string;
+}
+
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   className?: string;
