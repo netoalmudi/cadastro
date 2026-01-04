@@ -432,6 +432,15 @@ const ReportsTab: React.FC = () => {
                                 </p>
                             </div>
                         </div>
+
+                        {tripReportData.trip.roteiro && (
+                            <div className="mt-3 pt-2 border-t border-gray-200">
+                                <p className="text-[10px] text-gray-500 uppercase mb-1">Roteiro Detalhado</p>
+                                <div className="font-medium text-gray-800 whitespace-pre-wrap leading-snug bg-white p-2 rounded border border-gray-200">
+                                    {tripReportData.trip.roteiro}
+                                </div>
+                            </div>
+                        )}
                         
                         {tripReportData.trip.contratante_id && (
                             <div className="mt-3 pt-2 border-t border-gray-200">
