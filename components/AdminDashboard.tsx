@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, Calendar, MapPin, FileImage, Plane, FileText } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, Calendar, MapPin, FileImage, Plane, FileText, CheckCircle, Clock } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
 import ReportsTab from './ReportsTab';
@@ -61,7 +61,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       const { data: tripsData, error: tripsError } = await supabase
         .from('viagens')
         .select('*')
-        .order('data_ida', { ascending: true }); // Sort by upcoming trips
+        .order('data_ida', { ascending: true }); // Ordena cronologicamente (antigas -> novas)
 
       if (tripsError) {
           // Se a tabela não existir, não quebra a tela de clientes, apenas loga
@@ -385,53 +385,80 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                 Nenhuma viagem encontrada. Clique em "Nova Viagem" para começar.
                             </div>
                         ) : (
-                            filteredTrips.map(trip => (
-                                <div key={trip.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all p-5 flex flex-col md:flex-row items-start md:items-center gap-4">
+                            filteredTrips.map(trip => {
+                                // Lógica de Cores: Amarelo para passado, Verde para futuro
+                                const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
+                                const tripDateStr = trip.data_ida; // Já vem YYYY-MM-DD do banco
+                                const isPast = tripDateStr < todayStr;
+                                const isToday = tripDateStr === todayStr;
+
+                                // Base classes
+                                let containerClasses = "rounded-lg shadow-sm border hover:shadow-md transition-all p-5 flex flex-col md:flex-row items-start md:items-center gap-4";
+                                
+                                if (isPast) {
+                                    // Passado: Amarelo
+                                    containerClasses += " bg-yellow-50 border-yellow-200";
+                                } else {
+                                    // Futuro ou Hoje: Verde
+                                    containerClasses += " bg-green-50 border-green-200";
+                                }
+
+                                return (
+                                <div key={trip.id} className={containerClasses}>
                                     {/* Left: Info */}
                                     <div className="flex-grow">
-                                         <h3 className="text-lg font-bold text-gray-900">{trip.nome_viagem}</h3>
+                                         <div className="flex items-center gap-2 mb-1">
+                                            <h3 className="text-lg font-bold text-gray-900">{trip.nome_viagem}</h3>
+                                            {isPast ? (
+                                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-800 border border-yellow-300">Realizada</span>
+                                            ) : (
+                                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-green-200 text-green-800 border border-green-300">
+                                                    {isToday ? 'Hoje' : 'Em Breve'}
+                                                </span>
+                                            )}
+                                         </div>
                                          
                                          <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-600">
                                             <div className="flex items-center">
-                                                <MapPin size={16} className="text-gray-400 mr-1" />
+                                                <MapPin size={16} className={`${isPast ? 'text-yellow-600' : 'text-green-600'} mr-1`} />
                                                 {trip.origem} <span className="mx-2 text-gray-300">➔</span> {trip.destino}
                                             </div>
                                             <div className="hidden md:block w-1 h-1 bg-gray-300 rounded-full"></div>
                                             <div className="flex items-center">
-                                                <Calendar size={16} className="text-gray-400 mr-1" />
+                                                <Calendar size={16} className={`${isPast ? 'text-yellow-600' : 'text-green-600'} mr-1`} />
                                                 {trip.data_ida ? new Date(trip.data_ida).toLocaleDateString('pt-BR') : '-'} 
                                                 {trip.data_volta && ` até ${new Date(trip.data_volta).toLocaleDateString('pt-BR')}`}
                                             </div>
                                          </div>
 
                                          <div className="flex items-center gap-3 mt-3 text-xs font-medium text-gray-500">
-                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">
+                                            <span className={`px-2 py-1 rounded border ${isPast ? 'bg-yellow-100 border-yellow-200 text-yellow-800' : 'bg-green-100 border-green-200 text-green-800'}`}>
                                                 {trip.dias_total} dias
                                             </span>
-                                            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">
+                                            <span className="bg-white text-gray-600 px-2 py-1 rounded border border-gray-200">
                                                 {trip.km_total} km
                                             </span>
                                          </div>
                                     </div>
 
                                     {/* Right: Actions */}
-                                    <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-gray-100">
+                                    <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-gray-200/50">
                                          <button 
                                             onClick={() => handleEditTrip(trip)}
-                                            className="flex-1 md:flex-none px-4 py-2 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                            className="flex-1 md:flex-none px-4 py-2 bg-white/50 border border-gray-300 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-medium flex items-center justify-center gap-2"
                                          >
                                             <Pencil size={16} /> Editar
                                          </button>
                                          <button 
                                             onClick={() => handleDeleteTrip(trip.id)}
-                                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-100"
+                                            className="p-2 text-red-600 hover:bg-red-50/50 rounded-md transition-colors border border-transparent hover:border-red-100"
                                             title="Excluir"
                                          >
                                             <Trash2 size={18} />
                                          </button>
                                     </div>
                                 </div>
-                            ))
+                            )})
                         )}
                     </div>
                 )}
