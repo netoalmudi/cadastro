@@ -39,10 +39,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     
     try {
       // 1. Fetch Clients
+      // Alterado para ordenar por nome (alfabético) em vez de data de criação
       const { data: clientsData, error: clientsError } = await supabase
         .from('clientes')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('nome', { ascending: true })
+        .order('sobrenome', { ascending: true }); // Ordenação secundária pelo sobrenome
 
       if (clientsError) throw clientsError;
 
