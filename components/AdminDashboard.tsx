@@ -199,16 +199,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         <head>
           <title>Contrato - ${trip.nome_viagem}</title>
           <style>
-            @page { margin: 20mm 20mm 20mm 20mm; size: A4; }
-            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.3; color: #000; padding: 0; margin: 0; }
-            .header-info { text-align: right; margin-bottom: 20px; font-size: 10pt; }
-            h1 { font-size: 12pt; font-weight: bold; text-align: center; margin-bottom: 30px; text-transform: uppercase; }
-            p { text-align: justify; margin-bottom: 12px; }
+            @page { margin: 15mm; size: A4; }
+            body { font-family: 'Times New Roman', Times, serif; font-size: 10pt; line-height: 1.15; color: #000; padding: 0; margin: 0; }
+            .header-info { text-align: right; margin-bottom: 10px; font-size: 9pt; }
+            h1 { font-size: 11pt; font-weight: bold; text-align: center; margin-bottom: 20px; text-transform: uppercase; }
+            p { text-align: justify; margin-bottom: 8px; }
             .uppercase { text-transform: uppercase; }
             .bold { font-weight: bold; }
-            .signature-section { margin-top: 50px; display: flex; justify-content: space-between; gap: 20px; }
-            .signature-box { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px; font-size: 11pt; }
-            .footer-location { text-align: right; margin-top: 40px; margin-bottom: 40px; }
+            .signature-section { margin-top: 30px; display: flex; justify-content: space-between; gap: 20px; }
+            .signature-box { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px; font-size: 10pt; }
+            .footer-location { text-align: right; margin-top: 20px; margin-bottom: 20px; }
             ul { margin: 0; padding-left: 20px; }
             li { text-align: justify; margin-bottom: 5px; }
           </style>
