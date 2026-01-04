@@ -203,18 +203,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           <title>Emissão Aérea - ${group.nome_grupo}</title>
           <style>
             @media print {
-              body { font-family: sans-serif; padding: 20px; font-size: 12px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
-              th { background-color: #eee; text-transform: uppercase; }
-              h1 { font-size: 18px; margin-bottom: 5px; }
-              .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+              body { font-family: sans-serif; padding: 15px; font-size: 10px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              th, td { border: 1px solid #000; padding: 3px 5px; text-align: left; }
+              th { background-color: #eee; text-transform: uppercase; font-size: 10px; font-weight: bold; }
+              h1 { font-size: 14px; margin-bottom: 5px; }
+              p { margin: 2px 0; }
+              .header { margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 10px; }
               .uppercase { text-transform: uppercase; }
               .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
             }
-            body { font-family: sans-serif; padding: 20px; }
+            body { font-family: sans-serif; padding: 20px; font-size: 12px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
             th { background-color: #f0f0f0; }
             .header { border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
             .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
@@ -223,7 +224,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         <body>
           <div class="header">
             <h1>LISTA PARA EMISSÃO DE BILHETES AÉREOS</h1>
-            <p style="font-size: 14px; margin-bottom: 10px;"><strong>GRUPO:</strong> ${group.nome_grupo}</p>
+            <p><strong>GRUPO:</strong> ${group.nome_grupo}</p>
             
             <div class="info-grid">
                <div><strong>ORIGEM:</strong> ${group.origem || '-'}</div>
