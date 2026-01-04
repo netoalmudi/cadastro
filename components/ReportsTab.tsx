@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Trip, Client } from '../types';
-import { Printer, FileText, Download, Calendar, MapPin, Users, ChevronRight } from 'lucide-react';
+import { Printer, FileText, Download, Calendar, MapPin, Users, ChevronRight, Clock } from 'lucide-react';
 
 const ReportsTab: React.FC = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -201,7 +201,7 @@ const ReportsTab: React.FC = () => {
             <div className="border-b-2 border-primary pb-2 mb-4">
               <div className="flex justify-between items-start">
                 <div>
-                   <h1 className="text-xl font-bold text-gray-900 uppercase">Lista de Passageiros</h1>
+                   <h1 className="text-xl font-bold text-gray-900 uppercase">Relatório de Viagem</h1>
                    <p className="text-xs text-gray-500">Neto Almudi Viagens</p>
                 </div>
                 <div className="text-right">
@@ -212,34 +212,71 @@ const ReportsTab: React.FC = () => {
             </div>
 
             {/* DADOS DA VIAGEM */}
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4 text-xs">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase">Viagem</p>
-                  <p className="font-semibold text-gray-900">{reportData.trip.nome_viagem}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase">Destino</p>
-                  <p className="font-semibold text-gray-900 flex items-center gap-1">
-                    <MapPin size={10} /> {reportData.trip.destino}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase">Data Ida</p>
-                  <p className="font-semibold text-gray-900 flex items-center gap-1">
-                    <Calendar size={10} /> {new Date(reportData.trip.data_ida).toLocaleDateString('pt-BR')} {reportData.trip.hora_ida}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase">Passageiros</p>
-                  <p className="font-semibold text-primary flex items-center gap-1">
-                    <Users size={10} /> {reportData.passengers.length}
-                  </p>
-                </div>
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-6 text-xs">
+              
+              {/* Linha 1: Título e Passageiros */}
+              <div className="flex justify-between items-start mb-3 border-b border-gray-200 pb-2">
+                 <div>
+                    <p className="text-[10px] text-gray-500 uppercase">Viagem</p>
+                    <p className="font-bold text-sm text-gray-900">{reportData.trip.nome_viagem}</p>
+                 </div>
+                 <div className="text-right">
+                    <p className="text-[10px] text-gray-500 uppercase">Total Passageiros</p>
+                    <p className="font-bold text-sm text-primary flex items-center justify-end gap-1">
+                        <Users size={12} /> {reportData.passengers.length}
+                    </p>
+                 </div>
               </div>
+
+              {/* Linha 2: Origem e Destino */}
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                 <div>
+                    <p className="text-[10px] text-gray-500 uppercase">Cidade de Origem</p>
+                    <p className="font-semibold text-gray-900 flex items-center gap-1">
+                        <MapPin size={10} /> {reportData.trip.origem}
+                    </p>
+                 </div>
+                 <div>
+                    <p className="text-[10px] text-gray-500 uppercase">Cidade de Destino</p>
+                    <p className="font-semibold text-gray-900 flex items-center gap-1">
+                        <MapPin size={10} /> {reportData.trip.destino}
+                    </p>
+                 </div>
+              </div>
+
+              {/* Linha 3: Datas */}
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                 <div>
+                    <p className="text-[10px] text-gray-500 uppercase">Data/Hora Partida</p>
+                    <p className="font-semibold text-gray-900 flex items-center gap-1">
+                        <Calendar size={10} /> 
+                        {new Date(reportData.trip.data_ida).toLocaleDateString('pt-BR')} 
+                        <Clock size={10} className="ml-1" /> {reportData.trip.hora_ida}
+                    </p>
+                 </div>
+                 <div>
+                    <p className="text-[10px] text-gray-500 uppercase">Data/Hora Retorno</p>
+                    <p className="font-semibold text-gray-900 flex items-center gap-1">
+                        <Calendar size={10} /> 
+                        {reportData.trip.data_volta ? new Date(reportData.trip.data_volta).toLocaleDateString('pt-BR') : '-'} 
+                        <Clock size={10} className="ml-1" /> {reportData.trip.hora_volta || '-'}
+                    </p>
+                 </div>
+              </div>
+              
+              {/* Linha 4: Roteiro */}
+              {reportData.trip.roteiro && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-[10px] text-gray-500 uppercase mb-1">Roteiro Detalhado</p>
+                    <div className="text-gray-800 whitespace-pre-wrap leading-relaxed text-[11px] bg-white p-2 rounded border border-gray-100 text-justify">
+                        {reportData.trip.roteiro}
+                    </div>
+                  </div>
+              )}
+
               {/* Informação do Contratante, se houver */}
               {reportData.trip.contratante_id && (
-                  <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="mt-3 pt-2 border-t border-gray-200">
                     <p className="text-[10px] text-gray-500 uppercase">Contratante Responsável</p>
                     <p className="font-bold text-gray-900">
                         {reportData.passengers.find(p => p.id === reportData.trip.contratante_id)?.nome} {reportData.passengers.find(p => p.id === reportData.trip.contratante_id)?.sobrenome}
@@ -247,6 +284,8 @@ const ReportsTab: React.FC = () => {
                   </div>
               )}
             </div>
+
+            <h2 className="text-sm font-bold text-gray-800 mb-2 uppercase border-b pb-1">Lista de Passageiros</h2>
 
             {/* TABELA DE PASSAGEIROS */}
             <table className="w-full text-left border-collapse">
