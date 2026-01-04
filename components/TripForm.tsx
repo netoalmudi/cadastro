@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../db/database';
 import { Trip, Client } from '../types';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
-import { ArrowLeft, Save, Calendar, Clock, MapPin, Users, Search } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, Clock, MapPin, Users, Search, X, Plus, Trash2, Check } from 'lucide-react';
 
 interface TripFormProps {
   initialData?: Trip | null;
@@ -29,7 +29,20 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
   // Alterado para aceitar string (UUID) ou number
   const [selectedClientIds, setSelectedClientIds] = useState<(number | string)[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o dropdown se clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Carrega dados iniciais se estiver editando
   useEffect(() => {
@@ -85,12 +98,16 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const toggleClientSelection = (clientId: number | string) => {
-    setSelectedClientIds(prev => 
-      prev.includes(clientId) 
-        ? prev.filter(id => id !== clientId)
-        : [...prev, clientId]
-    );
+  const addClient = (clientId: number | string) => {
+    if (!selectedClientIds.includes(clientId)) {
+      setSelectedClientIds(prev => [...prev, clientId]);
+    }
+    setClientSearchTerm('');
+    setIsDropdownOpen(false);
+  };
+
+  const removeClient = (clientId: number | string) => {
+    setSelectedClientIds(prev => prev.filter(id => id !== clientId));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,12 +176,18 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
     }
   };
 
-  // Filtragem de clientes para seleção
-  const filteredClients = availableClients.filter(c => 
-    c.nome.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
-    c.sobrenome.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
-    c.cpf.includes(clientSearchTerm)
+  // Filtra clientes disponíveis (que ainda não foram selecionados e batem com a busca)
+  const availableToSelect = availableClients.filter(c => 
+    !selectedClientIds.includes(c.id) &&
+    (
+      c.nome.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+      c.sobrenome.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+      c.cpf.includes(clientSearchTerm)
+    )
   );
+
+  // Obtém os objetos completos dos clientes selecionados para exibir na lista
+  const selectedClientsList = availableClients.filter(c => selectedClientIds.includes(c.id));
 
   return (
     <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
@@ -234,47 +257,96 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
         </div>
 
         {/* SELEÇÃO DE CLIENTES */}
-        <SectionHeader title="Passageiros / Clientes" />
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <div className="bg-gray-50 p-3 border-b border-gray-200 flex items-center gap-2">
-            <Search size={18} className="text-gray-400" />
+        <SectionHeader title="Lista de Passageiros" />
+        
+        {/* Dropdown de Busca */}
+        <div className="relative mb-6" ref={dropdownRef}>
+          <label className="block text-sm font-semibold text-gray-600 mb-1">Adicionar Cliente</label>
+          <div className="relative">
             <input 
               type="text" 
-              placeholder="Buscar cliente para adicionar..." 
-              className="bg-transparent border-none focus:ring-0 w-full text-sm"
+              placeholder="Digite o nome ou CPF para buscar..." 
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               value={clientSearchTerm}
-              onChange={(e) => setClientSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setClientSearchTerm(e.target.value);
+                setIsDropdownOpen(true);
+              }}
+              onFocus={() => setIsDropdownOpen(true)}
             />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           </div>
-          <div className="max-h-60 overflow-y-auto p-2">
-             {filteredClients.length === 0 ? (
-               <p className="text-center text-sm text-gray-500 py-4">Nenhum cliente encontrado.</p>
-             ) : (
-               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                 {filteredClients.map(client => (
-                   <div 
-                     key={client.id}
-                     onClick={() => toggleClientSelection(client.id)}
-                     className={`
-                       cursor-pointer flex items-center p-2 rounded border text-sm transition-colors
-                       ${selectedClientIds.includes(client.id) 
-                         ? 'bg-blue-50 border-blue-300 text-blue-800' 
-                         : 'bg-white border-gray-100 hover:bg-gray-50 text-gray-700'}
-                     `}
-                   >
-                     <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 ${selectedClientIds.includes(client.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
-                        {selectedClientIds.includes(client.id) && <Users size={10} className="text-white" />}
-                     </div>
-                     <span className="truncate font-medium">{client.nome} {client.sobrenome}</span>
-                     <span className="ml-auto text-xs text-gray-400">{client.cpf}</span>
-                   </div>
-                 ))}
-               </div>
-             )}
+
+          {isDropdownOpen && (
+            <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {availableToSelect.length === 0 ? (
+                <div className="p-3 text-sm text-gray-500 text-center">Nenhum cliente disponível encontrado.</div>
+              ) : (
+                availableToSelect.map(client => (
+                  <button
+                    key={client.id}
+                    type="button"
+                    onClick={() => addClient(client.id)}
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-100 last:border-0 flex justify-between items-center group transition-colors"
+                  >
+                    <div>
+                      <div className="font-medium text-gray-800">{client.nome} {client.sobrenome}</div>
+                      <div className="text-xs text-gray-500">CPF: {client.cpf}</div>
+                    </div>
+                    <Plus size={16} className="text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Lista de Passageiros Adicionados */}
+        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+            <span className="font-medium text-gray-700 flex items-center gap-2">
+              <Users size={18} />
+              Passageiros Adicionados
+            </span>
+            <span className="text-xs font-bold bg-primary text-white px-2 py-1 rounded-full">
+              {selectedClientIds.length}
+            </span>
           </div>
-          <div className="bg-gray-50 px-3 py-2 border-t border-gray-200 text-xs text-gray-500 text-right">
-            {selectedClientIds.length} cliente(s) selecionado(s)
-          </div>
+          
+          {selectedClientsList.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
+              <Users size={32} className="opacity-20" />
+              <p>Nenhum passageiro adicionado nesta viagem.</p>
+              <p className="text-sm">Utilize a busca acima para adicionar clientes.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {selectedClientsList.map(client => (
+                <div key={client.id} className="flex justify-between items-center px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                       {client.nome.charAt(0)}{client.sobrenome.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{client.nome} {client.sobrenome}</div>
+                      <div className="text-xs text-gray-500 flex gap-3">
+                        <span>CPF: {client.cpf}</span>
+                        <span>Tel: {client.celular}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => removeClient(client.id)}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+                    title="Remover passageiro"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end pt-4 gap-3">
