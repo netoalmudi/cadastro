@@ -378,57 +378,57 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 )}
 
                 {activeTab === 'trips' && (
-                    // TRIPS TABLE
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    // TRIPS LIST (Vertical)
+                    <div className="space-y-4">
                         {filteredTrips.length === 0 ? (
-                            <div className="col-span-full bg-white p-12 text-center text-gray-500 rounded-lg border border-gray-200">
-                                Nenhum viagem encontrada. Clique em "Nova Viagem" para começar.
+                            <div className="bg-white p-12 text-center text-gray-500 rounded-lg border border-gray-200">
+                                Nenhuma viagem encontrada. Clique em "Nova Viagem" para começar.
                             </div>
                         ) : (
                             filteredTrips.map(trip => (
-                                <div key={trip.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
-                                    <div className="p-5">
-                                        <h3 className="text-lg font-bold text-gray-900 mb-1">{trip.nome_viagem}</h3>
-                                        <div className="flex items-center text-sm text-gray-500 mb-4">
-                                            <MapPin size={14} className="mr-1" />
-                                            {trip.origem} <span className="mx-1">➔</span> {trip.destino}
-                                        </div>
-                                        
-                                        <div className="flex justify-between items-center text-sm bg-gray-50 p-2 rounded mb-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-gray-400 text-xs uppercase">Partida</span>
-                                                <span className="font-medium text-gray-700 flex items-center gap-1">
-                                                    <Calendar size={12} /> {trip.data_ida ? new Date(trip.data_ida).toLocaleDateString('pt-BR') : '-'}
-                                                </span>
+                                <div key={trip.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all p-5 flex flex-col md:flex-row items-start md:items-center gap-4">
+                                    {/* Left: Info */}
+                                    <div className="flex-grow">
+                                         <h3 className="text-lg font-bold text-gray-900">{trip.nome_viagem}</h3>
+                                         
+                                         <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-600">
+                                            <div className="flex items-center">
+                                                <MapPin size={16} className="text-gray-400 mr-1" />
+                                                {trip.origem} <span className="mx-2 text-gray-300">➔</span> {trip.destino}
                                             </div>
-                                            <div className="flex flex-col text-right">
-                                                 <span className="text-gray-400 text-xs uppercase">Volta</span>
-                                                 <span className="font-medium text-gray-700 flex items-center gap-1 justify-end">
-                                                    {trip.data_volta ? new Date(trip.data_volta).toLocaleDateString('pt-BR') : '-'} <Calendar size={12} />
-                                                 </span>
+                                            <div className="hidden md:block w-1 h-1 bg-gray-300 rounded-full"></div>
+                                            <div className="flex items-center">
+                                                <Calendar size={16} className="text-gray-400 mr-1" />
+                                                {trip.data_ida ? new Date(trip.data_ida).toLocaleDateString('pt-BR') : '-'} 
+                                                {trip.data_volta && ` até ${new Date(trip.data_volta).toLocaleDateString('pt-BR')}`}
                                             </div>
-                                        </div>
+                                         </div>
 
-                                        <div className="flex items-center justify-between text-xs text-gray-500 mb-4 px-1">
-                                            <span>{trip.dias_total} dias</span>
-                                            <span>{trip.km_total} km</span>
-                                        </div>
+                                         <div className="flex items-center gap-3 mt-3 text-xs font-medium text-gray-500">
+                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">
+                                                {trip.dias_total} dias
+                                            </span>
+                                            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded border border-gray-200">
+                                                {trip.km_total} km
+                                            </span>
+                                         </div>
+                                    </div>
 
-                                        <div className="flex justify-end pt-3 border-t border-gray-100 gap-2">
-                                            <button 
-                                                onClick={() => handleEditTrip(trip)}
-                                                className="flex-1 py-2 text-center text-sm text-indigo-600 hover:bg-indigo-50 rounded transition-colors font-medium"
-                                            >
-                                                Editar / Detalhes
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDeleteTrip(trip.id)}
-                                                className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                title="Excluir"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                                    {/* Right: Actions */}
+                                    <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-gray-100">
+                                         <button 
+                                            onClick={() => handleEditTrip(trip)}
+                                            className="flex-1 md:flex-none px-4 py-2 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                         >
+                                            <Pencil size={16} /> Editar
+                                         </button>
+                                         <button 
+                                            onClick={() => handleDeleteTrip(trip.id)}
+                                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-100"
+                                            title="Excluir"
+                                         >
+                                            <Trash2 size={18} />
+                                         </button>
                                     </div>
                                 </div>
                             ))
