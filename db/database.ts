@@ -1,42 +1,30 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// ==============================================================================
+// CONFIGURAÇÃO DO BANCO DE DADOS (SUPABASE)
+// ==============================================================================
+// Para configurar, cole sua URL e KEY diretamente entre as aspas abaixo.
+// Não é necessário arquivo .env.
 
-// Validation Logic
-const isUrlValid = supabaseUrl && supabaseUrl.startsWith('https://');
-const isKeyValid = supabaseKey && supabaseKey.length > 20; // Basic length check for JWT/Key
+const SUPABASE_URL: string = "https://tggeygqmtgdlsevstbzc.supabase.co"; 
+// Exemplo: "https://xkxkxkxkxkxkxk.supabase.co"
 
-let client: SupabaseClient | null = null;
-let error: string | null = null;
-let configured = false;
+const SUPABASE_KEY: string = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ2V5Z3FtdGdkbHNldnN0YnpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzNDEwMDgsImV4cCI6MjA4MTkxNzAwOH0.Jkoxpey0lnWhQ_SXOnyUAfrVsZdQkzK-ZcgwhtLWDjM"; 
+// Exemplo: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
-// Determine state
-if (!supabaseUrl && !supabaseKey) {
-  // Case 1: Both missing -> Clean Demo Mode (No error message, just isSupabaseConfigured = false)
-  configured = false;
-} else if (!isUrlValid) {
-  // Case 2: URL exists but is invalid
-  error = "Erro de Configuração: 'VITE_SUPABASE_URL' deve ser uma URL válida começando com https://.";
-  configured = false;
-} else if (!isKeyValid) {
-  // Case 3: Key exists but is invalid/short
-  error = "Erro de Configuração: 'VITE_SUPABASE_ANON_KEY' parece inválida ou incompleta.";
-  configured = false;
-} else {
-  // Case 4: Valid Configuration
-  try {
-    client = createClient(supabaseUrl, supabaseKey);
-    configured = true;
-  } catch (e: any) {
-    error = `Erro Fatal Supabase: ${e.message}`;
-    configured = false;
-  }
-}
+// ==============================================================================
 
-export const configError = error;
-export const isSupabaseConfigured = configured;
+const hasUrl = SUPABASE_URL.length > 0;
+const hasKey = SUPABASE_KEY.length > 0;
 
-// We export null if not configured to prevent using a client with bad credentials.
-// Consumers must check isSupabaseConfigured or configError before using.
-export const supabase = client;
+export const isSupabaseConfigured = Boolean(hasUrl && hasKey);
+
+export const configError = isSupabaseConfigured
+  ? null
+  : "Credenciais ausentes. Abra o arquivo 'db/database.ts' e preencha SUPABASE_URL e SUPABASE_KEY.";
+
+// Cria o cliente se as chaves existirem, caso contrário exporta null
+// O ClientForm lidará com o null entrando em Modo Demonstração
+export const supabase = isSupabaseConfigured
+  ? createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
