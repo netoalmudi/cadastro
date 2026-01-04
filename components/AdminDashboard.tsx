@@ -200,17 +200,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               h1 { font-size: 18px; margin-bottom: 5px; }
               .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
               .uppercase { text-transform: uppercase; }
+              .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
             }
             body { font-family: sans-serif; padding: 20px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
             th { background-color: #f0f0f0; }
+            .header { border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
           </style>
         </head>
         <body>
           <div class="header">
             <h1>LISTA PARA EMISSÃO DE BILHETES AÉREOS</h1>
-            <p><strong>GRUPO:</strong> ${group.nome_grupo}</p>
+            <p style="font-size: 14px; margin-bottom: 10px;"><strong>GRUPO:</strong> ${group.nome_grupo}</p>
+            
+            <div class="info-grid">
+               <div><strong>ORIGEM:</strong> ${group.origem || '-'}</div>
+               <div><strong>DESTINO:</strong> ${group.destino || '-'}</div>
+            </div>
+
             <p><strong>ROTEIRO:</strong> ${group.roteiro || 'N/D'}</p>
             <p><strong>TOTAL PAX:</strong> ${passengers.length}</p>
           </div>
@@ -572,6 +581,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                         </div>
                                         {group.roteiro && (
                                             <p className="text-sm text-gray-600 line-clamp-2">{group.roteiro}</p>
+                                        )}
+                                        {(group.origem || group.destino) && (
+                                            <div className="flex items-center text-xs text-gray-500 mt-2 gap-2">
+                                                <Map size={14} />
+                                                <span>{group.origem || '?'}</span>
+                                                <span className="text-gray-300">➔</span>
+                                                <span>{group.destino || '?'}</span>
+                                            </div>
                                         )}
                                     </div>
 

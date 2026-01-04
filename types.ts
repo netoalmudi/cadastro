@@ -67,6 +67,8 @@ export interface AirGroup {
   created_at?: string;
   nome_grupo: string;
   roteiro: string;
+  origem?: string;
+  destino?: string;
 }
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {

@@ -3,7 +3,7 @@ import { supabase } from '../db/database';
 import { AirGroup, Client } from '../types';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
-import { ArrowLeft, Save, Users, Search, Plus, Trash2, Clock, Plane } from 'lucide-react';
+import { ArrowLeft, Save, Users, Search, Plus, Trash2, Clock, Plane, MapPin } from 'lucide-react';
 
 interface AirGroupFormProps {
   initialData?: AirGroup | null;
@@ -16,6 +16,8 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
   const [formData, setFormData] = useState<Omit<AirGroup, 'id' | 'created_at'>>({
     nome_grupo: '',
     roteiro: '',
+    origem: '',
+    destino: '',
   });
 
   const [selectedClientIds, setSelectedClientIds] = useState<(number | string)[]>([]);
@@ -41,6 +43,8 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
       setFormData({
         nome_grupo: initialData.nome_grupo,
         roteiro: initialData.roteiro || '',
+        origem: initialData.origem || '',
+        destino: initialData.destino || '',
       });
       fetchGroupClients(initialData.id);
     }
@@ -170,7 +174,7 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* DADOS GERAIS */}
         <SectionHeader title="Dados do Grupo" />
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input 
             label="Nome do Grupo / Identificação da Viagem" 
             name="nome_grupo" 
@@ -178,7 +182,34 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
             onChange={handleChange} 
             required 
             placeholder="Ex: Grupo Portugal 2024"
+            className="md:col-span-2"
           />
+          
+          {/* Origem e Destino */}
+          <div className="md:col-span-1">
+             <div className="relative">
+                <Input 
+                  label="Cidade Origem (Aeroporto)" 
+                  name="origem" 
+                  value={formData.origem} 
+                  onChange={handleChange} 
+                  placeholder="Ex: Curitiba (CWB)"
+                />
+                <MapPin className="absolute right-3 top-9 text-gray-400 w-4 h-4" />
+             </div>
+          </div>
+          <div className="md:col-span-1">
+             <div className="relative">
+                <Input 
+                  label="Cidade Destino (Aeroporto)" 
+                  name="destino" 
+                  value={formData.destino} 
+                  onChange={handleChange} 
+                  placeholder="Ex: Lisboa (LIS)"
+                />
+                <MapPin className="absolute right-3 top-9 text-gray-400 w-4 h-4" />
+             </div>
+          </div>
         </div>
 
         {/* ROTEIRO */}
@@ -188,7 +219,7 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
             name="roteiro" 
             rows={5} 
             className="w-full border border-gray-300 rounded px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Descreva o roteiro ou dados dos voos..."
+            placeholder="Descreva o roteiro, conexões ou dados detalhados dos voos..."
             value={formData.roteiro}
             onChange={handleChange}
           ></textarea>
