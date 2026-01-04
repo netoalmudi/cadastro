@@ -335,6 +335,43 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         return;
       }
 
+      // ======================================================================
+      // VERIFICAÇÃO DE DUPLICIDADE DE CPF
+      // ======================================================================
+      let cpfQuery = supabase
+        .from('clientes')
+        .select('id', { count: 'exact', head: true })
+        .eq('cpf', formData.cpf);
+
+      // Se estiver editando, exclui o próprio ID da verificação
+      if (initialData?.id) {
+        cpfQuery = cpfQuery.neq('id', initialData.id);
+      }
+
+      const { count, error: countError } = await cpfQuery;
+
+      if (countError) {
+        console.error("Erro ao verificar CPF:", countError);
+        // Não impede o fluxo por erro de conexão, mas loga. 
+        // Em sistemas críticos, poderia bloquear aqui.
+      } else if (count !== null && count > 0) {
+        // CPF JÁ EXISTE
+        setIsSubmitting(false);
+        setErrors(prev => ({ ...prev, cpf: 'CPF já cadastrado.' }));
+        
+        // Mensagem Personalizada Solicitada
+        alert("Este CPF já consta em nosso banco de dados.\n\nPara alterações ou dúvidas, entre em contato com o número (41) 99813-6567 - Neto Almudi.");
+        
+        // Scroll para o campo
+        const cpfElement = document.getElementsByName('cpf')[0];
+        if (cpfElement) {
+            cpfElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            cpfElement.focus();
+        }
+        return;
+      }
+      // ======================================================================
+
       // 1. Upload das Imagens (apenas se novas imagens foram selecionadas)
       // Se estamos editando e não mudamos a imagem, mantemos a URL antiga (que não temos no formState, mas o backend não deve ser sobrescrito se null)
       // Porém, o Supabase update sobrescreve se passarmos null? Não, mas precisamos passar o valor antigo se quisermos manter.
