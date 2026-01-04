@@ -3,20 +3,25 @@ import ClientForm from './components/ClientForm';
 import AdminDashboard from './components/AdminDashboard';
 import { Lock } from 'lucide-react';
 
+// ==============================================================================
+// CONFIGURAÇÃO DA SENHA ADMINISTRATIVA
+// ==============================================================================
+// Altere o valor abaixo para a senha que você deseja utilizar para acessar o painel
+const ADMIN_PASSWORD = "Offanengo157"; 
+// ==============================================================================
+
 const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Simples verificação de senha (em um app real, use Auth do Supabase)
   const handleAdminAccess = () => {
     if (isAdmin) {
         setIsAdmin(false);
         return;
     }
     
-    // Para simplificar o desenvolvimento, sem senha complexa por enquanto
-    // ou apenas um prompt simples
     const pass = window.prompt("Digite a senha de administrador:");
-    if (pass === "admin123") { // Senha hardcoded simples para exemplo
+    
+    if (pass === ADMIN_PASSWORD) {
         setIsAdmin(true);
     } else if (pass !== null) {
         alert("Senha incorreta");
