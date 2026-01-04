@@ -5,7 +5,7 @@ import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
 import { Camera, Upload, CheckCircle, Loader2 } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
-import { supabase } from '../db/database';
+import { supabase, isSupabaseConfigured } from '../db/database';
 
 // Interface para o estado do formulário
 interface ClientFormState {
@@ -261,6 +261,8 @@ const ClientForm: React.FC = () => {
 
   // Função auxiliar para upload de arquivos
   const uploadFile = async (file: File, folder: string) => {
+    if (!isSupabaseConfigured) return null;
+
     const fileExt = file.name.split('.').pop();
     // Nome único para evitar sobrescrita
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -311,6 +313,20 @@ const ClientForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      // MOCK: Se o Supabase não estiver configurado, simula o sucesso
+      if (!isSupabaseConfigured) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Simula delay de rede
+        console.group("Simulação de Envio (Sem Backend)");
+        console.log("Dados do formulário:", formData);
+        if (formData.arquivoRg) console.log("Arquivo RG:", formData.arquivoRg.name);
+        if (formData.arquivoPassaporte) console.log("Arquivo Passaporte:", formData.arquivoPassaporte.name);
+        console.groupEnd();
+
+        alert(`[MODO DEMONSTRAÇÃO]\nCadastro realizado com sucesso! \nProtocolo: ${protocolNumber}\n\nNota: Configure o arquivo .env para salvar no banco de dados.`);
+        resetForm();
+        return;
+      }
+
       // 1. Upload das Imagens (se existirem)
       let rgUrl = null;
       let passaporteUrl = null;
@@ -385,6 +401,13 @@ const ClientForm: React.FC = () => {
           <span className="font-mono text-primary font-medium">{protocolNumber}</span>
         </div>
       </div>
+
+      {!isSupabaseConfigured && (
+        <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700">
+          <p className="font-bold">Modo de Demonstração</p>
+          <p className="text-sm">O banco de dados não está configurado. Os dados preenchidos serão apenas simulados e não serão salvos permanentemente.</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} noValidate>
         
