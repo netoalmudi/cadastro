@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, Calendar, MapPin } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, Calendar, MapPin, FileImage, Plane } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
 
@@ -332,8 +332,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                                         <div className="text-sm text-gray-500 truncate max-w-[150px]">{client.email}</div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <button onClick={() => handleEditClient(client)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Pencil size={18} /></button>
-                                                        <button onClick={() => handleDeleteClient(client.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                                                        <div className="flex justify-end items-center">
+                                                            {(client.rg_url || client.passaporte_url) && (
+                                                                <div className="flex gap-2 mr-3 border-r pr-3 border-gray-200">
+                                                                    {client.rg_url && (
+                                                                        <a href={client.rg_url} target="_blank" title="Ver RG" className="text-gray-400 hover:text-blue-600 transition-colors">
+                                                                            <FileImage size={18} />
+                                                                        </a>
+                                                                    )}
+                                                                    {client.passaporte_url && (
+                                                                        <a href={client.passaporte_url} target="_blank" title="Ver Passaporte" className="text-gray-400 hover:text-blue-600 transition-colors">
+                                                                            <Plane size={18} />
+                                                                        </a>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            <button onClick={() => handleEditClient(client)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Pencil size={18} /></button>
+                                                            <button onClick={() => handleDeleteClient(client.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );

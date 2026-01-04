@@ -3,7 +3,7 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle, ArrowLeft } from 'lucide-react';
+import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle, ArrowLeft, Eye } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
 import { supabase, isSupabaseConfigured, configError } from '../db/database';
 import { Client, ClientFormData } from '../types';
@@ -555,56 +555,82 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         {/* DOCUMENTOS */}
         <SectionHeader title="Documentos" />
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-6">
           {/* RG UPLOAD */}
-          <label htmlFor="arquivoRg" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoRg || initialData?.rg_url ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
-            {processingFile === 'arquivoRg' ? (
-              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-            ) : formData.arquivoRg ? (
-              <CheckCircle className="w-5 h-5 text-green-500" />
-            ) : initialData?.rg_url ? (
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            ) : (
-              <Camera className="w-5 h-5 text-blue-500" />
+          <div className="flex flex-col gap-2 w-full sm:w-auto">
+            <label htmlFor="arquivoRg" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoRg || initialData?.rg_url ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
+              {processingFile === 'arquivoRg' ? (
+                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+              ) : formData.arquivoRg ? (
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              ) : initialData?.rg_url ? (
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              ) : (
+                <Camera className="w-5 h-5 text-blue-500" />
+              )}
+              <div className="flex flex-col items-center sm:items-start z-10">
+                <span className="text-sm font-medium">
+                  {processingFile === 'arquivoRg' 
+                    ? 'Processando...' 
+                    : formData.arquivoRg 
+                      ? 'Novo Arquivo Selecionado' 
+                      : initialData?.rg_url 
+                        ? 'Arquivo já enviado (clique para alterar)'
+                        : 'Foto RG/CPF/CNH'}
+                </span>
+              </div>
+              <input id="arquivoRg" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoRg')} onClick={(e) => (e.target as HTMLInputElement).value = ''} disabled={!!processingFile} />
+            </label>
+            {initialData?.rg_url && (
+                <a 
+                  href={initialData.rg_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 text-sm text-primary hover:text-blue-800 transition-colors py-2 border border-blue-100 rounded bg-blue-50"
+                  title="Abrir foto do RG em nova aba"
+                >
+                  <Eye size={16} /> Ver RG Atual
+                </a>
             )}
-            <div className="flex flex-col items-center sm:items-start z-10">
-              <span className="text-sm font-medium">
-                {processingFile === 'arquivoRg' 
-                  ? 'Processando...' 
-                  : formData.arquivoRg 
-                    ? 'Novo Arquivo Selecionado' 
-                    : initialData?.rg_url 
-                      ? 'Arquivo já enviado (clique para alterar)'
-                      : 'Foto RG/CPF/CNH'}
-              </span>
-            </div>
-            <input id="arquivoRg" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoRg')} onClick={(e) => (e.target as HTMLInputElement).value = ''} disabled={!!processingFile} />
-          </label>
+          </div>
 
           {/* PASSAPORTE UPLOAD */}
-          <label htmlFor="arquivoPassaporte" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoPassaporte || initialData?.passaporte_url ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
-            {processingFile === 'arquivoPassaporte' ? (
-              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-            ) : formData.arquivoPassaporte ? (
-              <CheckCircle className="w-5 h-5 text-green-500" />
-            ) : initialData?.passaporte_url ? (
-               <CheckCircle className="w-5 h-5 text-green-600" />
-            ) : (
-              <Upload className="w-5 h-5 text-blue-500" />
+          <div className="flex flex-col gap-2 w-full sm:w-auto">
+            <label htmlFor="arquivoPassaporte" className={`flex items-center justify-center gap-2 px-6 py-4 border border-dashed rounded cursor-pointer transition w-full sm:w-auto relative overflow-hidden ${formData.arquivoPassaporte || initialData?.passaporte_url ? 'border-green-500 bg-green-50 text-green-700' : 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-opacity-80'}`}>
+              {processingFile === 'arquivoPassaporte' ? (
+                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+              ) : formData.arquivoPassaporte ? (
+                <CheckCircle className="w-5 h-5 text-green-500" />
+              ) : initialData?.passaporte_url ? (
+                 <CheckCircle className="w-5 h-5 text-green-600" />
+              ) : (
+                <Upload className="w-5 h-5 text-blue-500" />
+              )}
+              <div className="flex flex-col items-center sm:items-start z-10">
+                 <span className="text-sm font-medium">
+                   {processingFile === 'arquivoPassaporte' 
+                     ? 'Processando...' 
+                     : formData.arquivoPassaporte 
+                       ? 'Novo Arquivo Selecionado' 
+                       : initialData?.passaporte_url 
+                         ? 'Arquivo já enviado (clique para alterar)'
+                         : 'Foto Passaporte'}
+                 </span>
+              </div>
+              <input id="arquivoPassaporte" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} onClick={(e) => (e.target as HTMLInputElement).value = ''} disabled={!!processingFile} />
+            </label>
+            {initialData?.passaporte_url && (
+                <a 
+                  href={initialData.passaporte_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 text-sm text-primary hover:text-blue-800 transition-colors py-2 border border-blue-100 rounded bg-blue-50"
+                  title="Abrir foto do Passaporte em nova aba"
+                >
+                  <Eye size={16} /> Ver Passaporte Atual
+                </a>
             )}
-            <div className="flex flex-col items-center sm:items-start z-10">
-               <span className="text-sm font-medium">
-                 {processingFile === 'arquivoPassaporte' 
-                   ? 'Processando...' 
-                   : formData.arquivoPassaporte 
-                     ? 'Novo Arquivo Selecionado' 
-                     : initialData?.passaporte_url 
-                       ? 'Arquivo já enviado (clique para alterar)'
-                       : 'Foto Passaporte'}
-               </span>
-            </div>
-            <input id="arquivoPassaporte" type="file" className="sr-only" accept="image/*" onChange={(e) => handleFileChange(e, 'arquivoPassaporte')} onClick={(e) => (e.target as HTMLInputElement).value = ''} disabled={!!processingFile} />
-          </label>
+          </div>
         </div>
 
         {/* OBSERVAÇÕES */}
