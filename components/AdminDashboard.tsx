@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, Calendar, MapPin, FileImage, Plane } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, Calendar, MapPin, FileImage, Plane, FileText } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
+import ReportsTab from './ReportsTab';
 
 interface AdminDashboardProps {
   onLogout: () => void;
 }
 
-type TabView = 'clients' | 'trips';
+type TabView = 'clients' | 'trips' | 'reports';
 type EditMode = 'list' | 'form';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
@@ -217,65 +218,76 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 >
                     Sair
                 </button>
-                <button 
-                    onClick={handleNew}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                    <Plus size={20} />
-                    {activeTab === 'clients' ? 'Novo Cliente' : 'Nova Viagem'}
-                </button>
+                {activeTab !== 'reports' && (
+                  <button 
+                      onClick={handleNew}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                      <Plus size={20} />
+                      {activeTab === 'clients' ? 'Novo Cliente' : 'Nova Viagem'}
+                  </button>
+                )}
             </div>
         </div>
 
         {/* Tabs Navigation */}
-        <div className="flex space-x-1 border-b border-gray-200 mb-6">
+        <div className="flex space-x-1 border-b border-gray-200 mb-6 overflow-x-auto">
             <button
                 onClick={() => { setActiveTab('clients'); setSearchTerm(''); }}
-                className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'clients' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'clients' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
                 <Users size={18} />
                 Clientes
             </button>
             <button
                 onClick={() => { setActiveTab('trips'); setSearchTerm(''); }}
-                className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'trips' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'trips' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
                 <Map size={18} />
                 Viagens
             </button>
-        </div>
-
-        {/* Search Bar */}
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="relative w-full sm:w-96">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <input 
-                    type="text" 
-                    placeholder={activeTab === 'clients' ? "Buscar por Nome, CPF ou Protocolo..." : "Buscar por Viagem ou Destino..."}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                {searchTerm && (
-                    <button 
-                        onClick={() => setSearchTerm('')}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                        <X size={16} />
-                    </button>
-                )}
-            </div>
-            <button 
-                onClick={fetchData} 
-                className="p-2 text-gray-500 hover:text-primary hover:bg-blue-50 rounded-full transition-colors"
-                title="Atualizar lista"
+            <button
+                onClick={() => { setActiveTab('reports'); setSearchTerm(''); }}
+                className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'reports' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
-                <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                <FileText size={18} />
+                Relatórios
             </button>
         </div>
 
+        {/* Search Bar - Hide on Reports Tab */}
+        {activeTab !== 'reports' && (
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="relative w-full sm:w-96">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <input 
+                      type="text" 
+                      placeholder={activeTab === 'clients' ? "Buscar por Nome, CPF ou Protocolo..." : "Buscar por Viagem ou Destino..."}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                      <button 
+                          onClick={() => setSearchTerm('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                          <X size={16} />
+                      </button>
+                  )}
+              </div>
+              <button 
+                  onClick={fetchData} 
+                  className="p-2 text-gray-500 hover:text-primary hover:bg-blue-50 rounded-full transition-colors"
+                  title="Atualizar lista"
+              >
+                  <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+              </button>
+          </div>
+        )}
+
         {/* Content Area */}
-        {fetchError && (
+        {fetchError && activeTab !== 'reports' && (
              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded shadow-sm">
                 <AlertCircle className="w-6 h-6 flex-shrink-0" />
                 <div>
@@ -285,13 +297,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             </div>
         )}
 
-        {loading ? (
+        {loading && activeTab !== 'reports' ? (
              <div className="p-12 flex justify-center items-center text-gray-500 bg-white rounded-lg border border-gray-200">
                 <RefreshCw className="animate-spin mr-2" /> Carregando dados...
             </div>
         ) : (
             <>
-                {activeTab === 'clients' ? (
+                {activeTab === 'reports' && (
+                  <ReportsTab />
+                )}
+
+                {activeTab === 'clients' && (
                     // CLIENTS TABLE
                     <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
                         {filteredClients.length === 0 ? (
@@ -359,7 +375,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             </div>
                         )}
                     </div>
-                ) : (
+                )}
+
+                {activeTab === 'trips' && (
                     // TRIPS TABLE
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredTrips.length === 0 ? (
