@@ -1,22 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
-import { Client } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle } from 'lucide-react';
+import { Client, Trip } from '../types';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, Calendar, MapPin } from 'lucide-react';
 import ClientForm from './ClientForm';
+import TripForm from './TripForm';
 
 interface AdminDashboardProps {
   onLogout: () => void;
 }
 
+type TabView = 'clients' | 'trips';
+type EditMode = 'list' | 'form';
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
+  // State for Clients
   const [clients, setClients] = useState<Client[]>([]);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  
+  // State for Trips
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+
+  // Common State
+  const [activeTab, setActiveTab] = useState<TabView>('clients');
+  const [mode, setMode] = useState<EditMode>('list');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [view, setView] = useState<'list' | 'form'>('list');
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const fetchClients = async () => {
+  const fetchData = async () => {
     if (!isSupabaseConfigured || !supabase) {
         setLoading(false);
         return;
@@ -26,98 +38,147 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     setFetchError(null);
     
     try {
-      const { data, error } = await supabase
+      // 1. Fetch Clients
+      const { data: clientsData, error: clientsError } = await supabase
         .from('clientes')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Erro ao buscar clientes:", error);
-        setFetchError("Erro ao conectar com o banco de dados. Verifique o console para mais detalhes.");
-      } else {
-        // Mapeamento dos campos do banco (snake_case) para a interface (camelCase)
-        // Isso é necessário porque o banco usa 'data_nascimento' e a aplicação 'dataNascimento'
-        const mappedData: Client[] = (data || []).map((item: any) => ({
-          ...item,
-          dataNascimento: item.data_nascimento || item.dataNascimento,
-          ufRg: item.uf_rg || item.ufRg,
-        }));
-        
-        setClients(mappedData);
-        console.log("Clientes carregados:", mappedData);
+      if (clientsError) throw clientsError;
+
+      // Map snake_case to camelCase for Clients
+      const mappedClients: Client[] = (clientsData || []).map((item: any) => ({
+        ...item,
+        dataNascimento: item.data_nascimento || item.dataNascimento,
+        ufRg: item.uf_rg || item.ufRg,
+      }));
+      setClients(mappedClients);
+
+      // 2. Fetch Trips
+      const { data: tripsData, error: tripsError } = await supabase
+        .from('viagens')
+        .select('*')
+        .order('data_ida', { ascending: true }); // Sort by upcoming trips
+
+      if (tripsError) {
+          // Se a tabela não existir, não quebra a tela de clientes, apenas loga
+          console.warn("Tabela de viagens pode não existir ainda.", tripsError);
       }
+
+      if (tripsData) {
+        setTrips(tripsData as Trip[]);
+      }
+
     } catch (err: any) {
-      console.error("Exceção ao buscar clientes:", err);
-      setFetchError("Ocorreu um erro inesperado ao buscar os dados.");
+      console.error("Erro ao buscar dados:", err);
+      setFetchError("Ocorreu um erro ao buscar os dados. Verifique a conexão.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchClients();
+    fetchData();
   }, []);
 
-  const handleDelete = async (id: number) => {
+  // --- Handlers for Clients ---
+  const handleDeleteClient = async (id: number | string) => {
     if (!isSupabaseConfigured || !supabase) return;
-    
-    if (window.confirm("Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.")) {
+    if (window.confirm("Tem certeza que deseja excluir este cliente?")) {
       const { error } = await supabase.from('clientes').delete().eq('id', id);
-      
-      if (error) {
-        alert("Erro ao excluir cliente: " + error.message);
-      } else {
-        setClients(prev => prev.filter(c => c.id !== id));
-      }
+      if (error) alert("Erro: " + error.message);
+      else setClients(prev => prev.filter(c => c.id !== id));
     }
   };
 
-  const handleEdit = (client: Client) => {
+  const handleEditClient = (client: Client) => {
     setEditingClient(client);
-    setView('form');
+    setMode('form');
   };
 
+  // --- Handlers for Trips ---
+  const handleDeleteTrip = async (id: number) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    if (window.confirm("Tem certeza que deseja excluir esta viagem?")) {
+      const { error } = await supabase.from('viagens').delete().eq('id', id);
+      if (error) alert("Erro: " + error.message);
+      else setTrips(prev => prev.filter(t => t.id !== id));
+    }
+  };
+
+  const handleEditTrip = (trip: Trip) => {
+    setEditingTrip(trip);
+    setMode('form');
+  };
+
+  // --- Common Handlers ---
   const handleNew = () => {
-    setEditingClient(null);
-    setView('form');
+    if (activeTab === 'clients') setEditingClient(null);
+    else setEditingTrip(null);
+    setMode('form');
   };
 
   const handleFormSuccess = () => {
-    fetchClients();
-    setView('list');
+    fetchData(); // Reload all data to be fresh
+    setMode('list');
     setEditingClient(null);
+    setEditingTrip(null);
   };
 
   const handleFormCancel = () => {
-    setView('list');
+    setMode('list');
     setEditingClient(null);
+    setEditingTrip(null);
   };
 
-  const filteredClients = clients.filter(client => 
-    (client.nome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (client.sobrenome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (client.cpf || '').includes(searchTerm) ||
-    (client.protocolo || '').includes(searchTerm)
+  // --- Filtering ---
+  const filteredClients = clients.filter(c => 
+    (c.nome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (c.sobrenome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (c.cpf || '').includes(searchTerm) ||
+    (c.protocolo || '').includes(searchTerm)
   );
 
-  if (view === 'form') {
-    return (
-      <ClientForm 
-        initialData={editingClient} 
-        onSuccess={handleFormSuccess} 
-        onCancel={handleFormCancel}
-        isAdmin={true}
-      />
-    );
+  const filteredTrips = trips.filter(t => 
+    (t.nome_viagem?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (t.destino?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  );
+
+  // --- Render Views ---
+
+  if (mode === 'form') {
+    if (activeTab === 'clients') {
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+            <ClientForm 
+                initialData={editingClient} 
+                onSuccess={handleFormSuccess} 
+                onCancel={handleFormCancel}
+                isAdmin={true}
+            />
+        </div>
+      );
+    } else {
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8 mt-6">
+            <TripForm
+                initialData={editingTrip}
+                availableClients={clients}
+                onSuccess={handleFormSuccess}
+                onCancel={handleFormCancel}
+            />
+        </div>
+      );
+    }
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900">Gerenciamento de Clientes</h1>
-                <p className="text-gray-500">Administre os cadastros recebidos.</p>
+                <h1 className="text-2xl font-bold text-gray-900">Painel Administrativo</h1>
+                <p className="text-gray-500">Gerencie clientes e viagens.</p>
             </div>
             <div className="flex gap-3">
                  <button 
@@ -131,18 +192,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
                 >
                     <Plus size={20} />
-                    Novo Cliente
+                    {activeTab === 'clients' ? 'Novo Cliente' : 'Nova Viagem'}
                 </button>
             </div>
         </div>
 
-        {/* Search and Filters */}
+        {/* Tabs Navigation */}
+        <div className="flex space-x-1 border-b border-gray-200 mb-6">
+            <button
+                onClick={() => { setActiveTab('clients'); setSearchTerm(''); }}
+                className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'clients' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+                <Users size={18} />
+                Clientes
+            </button>
+            <button
+                onClick={() => { setActiveTab('trips'); setSearchTerm(''); }}
+                className={`px-6 py-3 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'trips' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+                <Map size={18} />
+                Viagens
+            </button>
+        </div>
+
+        {/* Search Bar */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="relative w-full sm:w-96">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <input 
                     type="text" 
-                    placeholder="Buscar por Nome, CPF ou Protocolo..." 
+                    placeholder={activeTab === 'clients' ? "Buscar por Nome, CPF ou Protocolo..." : "Buscar por Viagem ou Destino..."}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -157,7 +236,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 )}
             </div>
             <button 
-                onClick={fetchClients} 
+                onClick={fetchData} 
                 className="p-2 text-gray-500 hover:text-primary hover:bg-blue-50 rounded-full transition-colors"
                 title="Atualizar lista"
             >
@@ -165,7 +244,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             </button>
         </div>
 
-        {/* Error Message */}
+        {/* Content Area */}
         {fetchError && (
              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded shadow-sm">
                 <AlertCircle className="w-6 h-6 flex-shrink-0" />
@@ -176,113 +255,113 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             </div>
         )}
 
-        {/* Table Content */}
-        <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-            {loading ? (
-                <div className="p-12 flex justify-center items-center text-gray-500">
-                    <RefreshCw className="animate-spin mr-2" /> Carregando dados...
-                </div>
-            ) : filteredClients.length === 0 ? (
-                <div className="p-12 text-center text-gray-500">
-                    <p className="text-lg font-medium text-gray-600 mb-2">
-                        {searchTerm ? "Nenhum cliente encontrado para sua busca." : "Nenhum registro encontrado."}
-                    </p>
-                    
-                    {!searchTerm && !fetchError && (
-                        <div className="mt-6 max-w-lg mx-auto bg-blue-50 p-4 rounded-lg border border-blue-100 text-left">
-                            <p className="text-sm text-blue-800 font-bold mb-2 flex items-center gap-2">
-                                <AlertCircle size={16} />
-                                Dica de Solução de Problemas (Supabase):
-                            </p>
-                            <p className="text-sm text-blue-700 mb-2">
-                                Se você já cadastrou clientes mas eles não aparecem aqui, é provável que as 
-                                <strong> Políticas de Segurança (RLS)</strong> do seu banco de dados estejam bloqueando a leitura.
-                            </p>
-                            <ul className="list-disc list-inside text-xs text-blue-600 space-y-1">
-                                <li>Acesse o painel do Supabase {'>'} Table Editor {'>'} clientes.</li>
-                                <li>Verifique se há dados na tabela.</li>
-                                <li>Se houver dados, vá em Authentication {'>'} Policies.</li>
-                                <li>Adicione uma política para habilitar "SELECT" para o role "anon" ou "public".</li>
-                            </ul>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Protocolo</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documentos</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
-                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredClients.map((client) => (
-                                <tr key={client.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-mono font-medium text-primary">{client.protocolo}</div>
-                                        <div className="text-xs text-gray-400">
-                                            {new Date(client.created_at).toLocaleDateString('pt-BR')}
+        {loading ? (
+             <div className="p-12 flex justify-center items-center text-gray-500 bg-white rounded-lg border border-gray-200">
+                <RefreshCw className="animate-spin mr-2" /> Carregando dados...
+            </div>
+        ) : (
+            <>
+                {activeTab === 'clients' ? (
+                    // CLIENTS TABLE
+                    <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+                        {filteredClients.length === 0 ? (
+                            <div className="p-12 text-center text-gray-500">Nenhum cliente encontrado.</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Protocolo</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {filteredClients.map((client) => (
+                                            <tr key={client.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-mono font-medium text-primary">{client.protocolo}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-medium text-gray-900">{client.nome} {client.sobrenome}</div>
+                                                    <div className="text-sm text-gray-500">{client.cpf}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm text-gray-900">{client.celular}</div>
+                                                    <div className="text-sm text-gray-500 truncate max-w-[150px]">{client.email}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    <button onClick={() => handleEditClient(client)} className="text-indigo-600 hover:text-indigo-900 mr-4"><Pencil size={18} /></button>
+                                                    <button onClick={() => handleDeleteClient(client.id)} className="text-red-600 hover:text-red-900"><Trash2 size={18} /></button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    // TRIPS TABLE
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredTrips.length === 0 ? (
+                            <div className="col-span-full bg-white p-12 text-center text-gray-500 rounded-lg border border-gray-200">
+                                Nenhum viagem encontrada. Clique em "Nova Viagem" para começar.
+                            </div>
+                        ) : (
+                            filteredTrips.map(trip => (
+                                <div key={trip.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
+                                    <div className="p-5">
+                                        <h3 className="text-lg font-bold text-gray-900 mb-1">{trip.nome_viagem}</h3>
+                                        <div className="flex items-center text-sm text-gray-500 mb-4">
+                                            <MapPin size={14} className="mr-1" />
+                                            {trip.origem} <span className="mx-1">➔</span> {trip.destino}
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center">
-                                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                                                {client.nome ? client.nome.charAt(0) : '?'}{client.sobrenome ? client.sobrenome.charAt(0) : ''}
+                                        
+                                        <div className="flex justify-between items-center text-sm bg-gray-50 p-2 rounded mb-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-gray-400 text-xs uppercase">Partida</span>
+                                                <span className="font-medium text-gray-700 flex items-center gap-1">
+                                                    <Calendar size={12} /> {trip.data_ida ? new Date(trip.data_ida).toLocaleDateString('pt-BR') : '-'}
+                                                </span>
                                             </div>
-                                            <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900">{client.nome} {client.sobrenome}</div>
-                                                <div className="text-sm text-gray-500">{client.cpf}</div>
+                                            <div className="flex flex-col text-right">
+                                                 <span className="text-gray-400 text-xs uppercase">Volta</span>
+                                                 <span className="font-medium text-gray-700 flex items-center gap-1 justify-end">
+                                                    {trip.data_volta ? new Date(trip.data_volta).toLocaleDateString('pt-BR') : '-'} <Calendar size={12} />
+                                                 </span>
                                             </div>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex space-x-2">
-                                            {client.rg_url ? (
-                                                <a href={client.rg_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full border border-green-200 hover:bg-green-200 transition-colors">RG</a>
-                                            ) : (
-                                                <span className="text-xs bg-gray-100 text-gray-400 px-2 py-1 rounded-full border border-gray-200">S/ RG</span>
-                                            )}
-                                            {client.passaporte_url ? (
-                                                <a href={client.passaporte_url} target="_blank" rel="noopener noreferrer" className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full border border-purple-200 hover:bg-purple-200 transition-colors">Passaporte</a>
-                                            ) : (
-                                                <span className="text-xs bg-gray-100 text-gray-400 px-2 py-1 rounded-full border border-gray-200">S/ Pass</span>
-                                            )}
+
+                                        <div className="flex items-center justify-between text-xs text-gray-500 mb-4 px-1">
+                                            <span>{trip.dias_total} dias</span>
+                                            <span>{trip.km_total} km</span>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{client.celular}</div>
-                                        <div className="text-sm text-gray-500 truncate max-w-[150px]">{client.email}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button 
-                                            onClick={() => handleEdit(client)}
-                                            className="text-indigo-600 hover:text-indigo-900 mr-4" 
-                                            title="Editar"
-                                        >
-                                            <Pencil size={18} />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDelete(client.id)}
-                                            className="text-red-600 hover:text-red-900" 
-                                            title="Excluir"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </div>
-        <div className="mt-4 text-xs text-gray-400 text-center">
-             Exibindo {filteredClients.length} registro(s).
-        </div>
+
+                                        <div className="flex justify-end pt-3 border-t border-gray-100 gap-2">
+                                            <button 
+                                                onClick={() => handleEditTrip(trip)}
+                                                className="flex-1 py-2 text-center text-sm text-indigo-600 hover:bg-indigo-50 rounded transition-colors font-medium"
+                                            >
+                                                Editar / Detalhes
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteTrip(trip.id)}
+                                                className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                title="Excluir"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+            </>
+        )}
     </div>
   );
 };

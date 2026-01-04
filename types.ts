@@ -32,11 +32,26 @@ export interface ClientFormData {
 
 // Extends FormData to include Database fields
 export interface Client extends ClientFormData {
-  id: number;
+  id: string | number; // Alterado para aceitar UUID (string) ou ID numérico
   created_at: string;
   protocolo: string;
   rg_url?: string;
   passaporte_url?: string;
+}
+
+export interface Trip {
+  id: number;
+  created_at?: string;
+  nome_viagem: string;
+  origem: string;
+  destino: string;
+  data_ida: string;
+  hora_ida: string;
+  data_volta: string;
+  hora_volta: string;
+  roteiro: string;
+  km_total: number | string;
+  dias_total: number | string;
 }
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
