@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip, AirGroup } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar, FileSignature } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar, FileSignature, ChevronLeft, ChevronRight } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
 import AirGroupForm from './AirGroupForm';
@@ -14,6 +14,8 @@ interface AdminDashboardProps {
 
 type TabView = 'clients' | 'trips' | 'air' | 'reports';
 type EditMode = 'list' | 'form';
+
+const ITEMS_PER_PAGE = 7;
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // State for Clients
@@ -34,6 +36,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchData = async () => {
     if (!isSupabaseConfigured || !supabase) {
@@ -90,6 +95,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Reset page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeTab]);
 
   // Helper para calcular idade
   const calculateAge = (birthDate: string | undefined) => {
@@ -475,12 +485,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     setEditingAirGroup(null);
   };
 
-  // --- Filtering ---
+  // --- Filtering & Pagination ---
   const filteredClients = clients.filter(c => 
     (c.nome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
     (c.sobrenome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
     (c.cpf || '').includes(searchTerm)
   );
+
+  const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedClients = filteredClients.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const filteredTrips = trips.filter(t => 
     (t.nome_viagem?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -647,6 +661,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
                 {activeTab === 'clients' && (
                     // CLIENTS TABLE
+                    <>
                     <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
                         {filteredClients.length === 0 ? (
                             <div className="p-12 text-center text-gray-500">Nenhum cliente encontrado.</div>
@@ -668,7 +683,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {filteredClients.map((client) => {
+                                        {paginatedClients.map((client) => {
                                             const age = calculateAge(client.dataNascimento);
                                             const isSenior = age !== null && age >= 60;
                                             return (
@@ -734,6 +749,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                             </div>
                         )}
                     </div>
+
+                    {/* PAGINATION CONTROLS */}
+                    {totalPages > 1 && (
+                        <div className="flex justify-center items-center gap-2 mt-4 select-none">
+                            <button 
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            
+                            <div className="flex gap-1 overflow-x-auto max-w-[300px] scrollbar-hide">
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                    <button
+                                        key={page}
+                                        onClick={() => setCurrentPage(page)}
+                                        className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium transition-colors ${
+                                            currentPage === page 
+                                            ? 'bg-primary text-white' 
+                                            : 'bg-white border border-gray-300 hover:bg-gray-50 text-gray-700'
+                                        }`}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <button 
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    )}
+                    </>
                 )}
 
                 {activeTab === 'trips' && (
