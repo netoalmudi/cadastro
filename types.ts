@@ -75,6 +75,7 @@ export interface Hotel {
   id: number;
   created_at?: string;
   nome_hotel: string;
+  pais?: string;
   check_in: string;
   check_out: string;
   valor_total_brl: number | string;

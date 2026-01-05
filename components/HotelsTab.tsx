@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Trip, AirGroup, Hotel } from '../types';
 import Input from './ui/Input';
-import { Bed, Plus, Trash2, Calendar, Loader2, Hotel as HotelIcon, Search, MapPin, Plane, Bus } from 'lucide-react';
+import { Bed, Plus, Trash2, Calendar, Loader2, Hotel as HotelIcon, Search, MapPin, Plane, Bus, Globe } from 'lucide-react';
 
 const HotelsTab: React.FC = () => {
   // Selection State
@@ -22,6 +22,7 @@ const HotelsTab: React.FC = () => {
   // Form State
   const initialForm = {
     nome_hotel: '',
+    pais: '',
     check_in: '',
     check_out: '',
     valor_total_brl: '',
@@ -216,7 +217,7 @@ const HotelsTab: React.FC = () => {
                         <Plus size={16} /> Cadastrar Novo Hotel
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                        <div className="md:col-span-4">
+                        <div className="md:col-span-3">
                             <Input 
                                 label="Nome do Hotel" 
                                 name="nome_hotel" 
@@ -224,6 +225,16 @@ const HotelsTab: React.FC = () => {
                                 onChange={handleFormChange} 
                                 placeholder="Ex: Ibis Paris Centro"
                                 required
+                                className="mb-0 bg-white"
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <Input 
+                                label="País" 
+                                name="pais" 
+                                value={formData.pais} 
+                                onChange={handleFormChange} 
+                                placeholder="Ex: França"
                                 className="mb-0 bg-white"
                             />
                         </div>
@@ -247,9 +258,9 @@ const HotelsTab: React.FC = () => {
                                 className="mb-0 bg-white" 
                             />
                         </div>
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-1">
                             <Input 
-                                label="Valor Total (R$)" 
+                                label="R$" 
                                 name="valor_total_brl" 
                                 type="number"
                                 step="0.01"
@@ -262,7 +273,7 @@ const HotelsTab: React.FC = () => {
                         <div className="md:col-span-2 flex gap-2">
                             <div className="relative w-full">
                                 <Input 
-                                    label="Valor Total (€)" 
+                                    label="€" 
                                     name="valor_total_eur" 
                                     type="number"
                                     step="0.01"
@@ -300,7 +311,7 @@ const HotelsTab: React.FC = () => {
                         <table className="w-full text-sm text-left">
                             <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200">
                                 <tr>
-                                    <th className="px-6 py-4">Hotel</th>
+                                    <th className="px-6 py-4">Hotel / País</th>
                                     <th className="px-6 py-4">Período (Check-in / Check-out)</th>
                                     <th className="px-6 py-4 text-right">Custo em Reais (R$)</th>
                                     <th className="px-6 py-4 text-right">Custo em Euros (€)</th>
@@ -310,11 +321,17 @@ const HotelsTab: React.FC = () => {
                             <tbody className="divide-y divide-gray-100">
                                 {hotels.map(hotel => (
                                     <tr key={hotel.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-gray-900">
-                                            <div className="flex items-center gap-2">
+                                        <td className="px-6 py-4">
+                                            <div className="font-medium text-gray-900 flex items-center gap-2">
                                                 <HotelIcon size={16} className="text-gray-400" />
                                                 {hotel.nome_hotel}
                                             </div>
+                                            {hotel.pais && (
+                                                <div className="text-xs text-gray-500 flex items-center gap-1 mt-1 ml-6">
+                                                    <Globe size={12} />
+                                                    {hotel.pais}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-gray-600">
                                             <div className="flex items-center gap-2">
