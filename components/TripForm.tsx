@@ -3,7 +3,6 @@ import { supabase } from '../db/database';
 import { Trip, Client } from '../types';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
-import HotelManager from './HotelManager';
 import { ArrowLeft, Save, Calendar, Clock, MapPin, Users, Search, X, Plus, Trash2, Check, DollarSign, Calculator, Star, Crown } from 'lucide-react';
 
 interface TripFormProps {
@@ -500,15 +499,6 @@ const TripForm: React.FC<TripFormProps> = ({ initialData, availableClients, onSu
             </div>
           )}
         </div>
-
-        {/* HOTEL MANAGER INTEGRATION */}
-        {initialData?.id ? (
-          <HotelManager parentId={initialData.id} parentType="viagem" />
-        ) : (
-          <div className="mt-8 p-6 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-center">
-            <p className="text-gray-500">Salve a viagem para poder adicionar reservas de hotéis.</p>
-          </div>
-        )}
 
         <div className="flex justify-end pt-4 gap-3">
           <button 
