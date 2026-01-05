@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
-import { Trip, Client } from '../types';
-import { Printer, FileText, Calendar, MapPin, Users, ChevronRight, Clock, Cake, PartyPopper } from 'lucide-react';
+import { Trip, Client, Hotel } from '../types';
+import { Printer, FileText, Calendar, MapPin, Users, ChevronRight, Clock, Cake, PartyPopper, Building2, Globe, ArrowRight } from 'lucide-react';
 
-type ReportType = 'trip' | 'birthday';
+type ReportType = 'trip' | 'birthday' | 'hotel';
 
 const months = [
   { value: '01', label: 'Janeiro' },
@@ -32,12 +32,24 @@ const ReportsTab: React.FC = () => {
   // Birthday Report State
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [birthdayClients, setBirthdayClients] = useState<Client[] | null>(null);
+
+  // Hotel Report State
+  const [hotelCountries, setHotelCountries] = useState<string[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [hotelReportData, setHotelReportData] = useState<any[] | null>(null);
   
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchTrips();
   }, []);
+
+  // Fetch unique countries when switching to Hotel tab
+  useEffect(() => {
+    if (activeReport === 'hotel') {
+        fetchHotelCountries();
+    }
+  }, [activeReport]);
 
   const fetchTrips = async () => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -49,6 +61,23 @@ const ReportsTab: React.FC = () => {
 
     if (!error && data) {
       setTrips(data as Trip[]);
+    }
+  };
+
+  const fetchHotelCountries = async () => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    // Fetch all countries to create a distinct list
+    const { data, error } = await supabase
+        .from('hoteis')
+        .select('pais')
+        .neq('pais', null)
+        .neq('pais', ''); // Ensure valid strings
+
+    if (!error && data) {
+        // Extract unique countries
+        const countries = Array.from(new Set(data.map((item: any) => item.pais))).sort();
+        setHotelCountries(countries);
     }
   };
 
@@ -92,7 +121,8 @@ const ReportsTab: React.FC = () => {
         trip: tripData as Trip,
         passengers: passengers as Client[]
       });
-      setBirthdayClients(null); // Clear other report
+      setBirthdayClients(null); 
+      setHotelReportData(null);
 
     } catch (error) {
       console.error("Erro ao gerar relatório de viagem:", error);
@@ -108,8 +138,6 @@ const ReportsTab: React.FC = () => {
 
     setLoading(true);
     try {
-      // Fetch all clients (filtering dates in JS is often safer for mixed formats)
-      // If database grows huge, we should optimize this to SQL
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
@@ -128,23 +156,14 @@ const ReportsTab: React.FC = () => {
         if (!client.dataNascimento) return false;
         
         let month = '';
-        let day = '';
         
-        // Handle DD/MM/YYYY
         if (client.dataNascimento.includes('/')) {
             const parts = client.dataNascimento.split('/');
-            if (parts.length === 3) {
-                month = parts[1];
-                day = parts[0];
-            }
+            if (parts.length === 3) month = parts[1];
         } 
-        // Handle YYYY-MM-DD
         else if (client.dataNascimento.includes('-')) {
             const parts = client.dataNascimento.split('-');
-            if (parts.length === 3) {
-                month = parts[1];
-                day = parts[2];
-            }
+            if (parts.length === 3) month = parts[1];
         }
 
         return month === selectedMonth;
@@ -161,7 +180,8 @@ const ReportsTab: React.FC = () => {
       });
 
       setBirthdayClients(birthdays);
-      setTripReportData(null); // Clear other report
+      setTripReportData(null);
+      setHotelReportData(null);
 
     } catch (error) {
         console.error("Erro ao gerar relatório de aniversariantes:", error);
@@ -170,6 +190,39 @@ const ReportsTab: React.FC = () => {
         setLoading(false);
     }
   };
+
+  // --- LOGIC: HOTEL REPORT ---
+  const generateHotelReport = async () => {
+      if (!selectedCountry || !supabase) return;
+      setLoading(true);
+
+      try {
+          // Fetch hotels filtered by country and order by check_in DESC
+          // Also fetch related trip or group name using Supabase relational query
+          const { data, error } = await supabase
+            .from('hoteis')
+            .select(`
+                *,
+                viagens (nome_viagem),
+                grupos_aereos (nome_grupo)
+            `)
+            .eq('pais', selectedCountry)
+            .order('check_in', { ascending: false }); // Do mais recente para o mais antigo
+
+          if (error) throw error;
+
+          setHotelReportData(data);
+          setTripReportData(null);
+          setBirthdayClients(null);
+
+      } catch (error) {
+          console.error("Erro ao gerar relatório de hotéis:", error);
+          alert("Erro ao buscar hotéis.");
+      } finally {
+          setLoading(false);
+      }
+  };
+
 
   // --- UTILS ---
   const calculateAge = (birthDate: string | undefined) => {
@@ -202,21 +255,27 @@ const ReportsTab: React.FC = () => {
   };
 
   const formatDateFull = (dateStr: string) => {
-      if (!dateStr) return '';
+      if (!dateStr) return '-';
       if (dateStr.includes('/')) return dateStr;
       const parts = dateStr.split('-');
       if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
       return dateStr;
   }
 
+  const formatCurrency = (val: number | string, currency: 'BRL' | 'EUR') => {
+    const num = Number(val) || 0;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(num);
+  };
+
   // --- PRINT HANDLERS ---
   const handlePrint = () => {
     const printContent = document.getElementById('printable-area');
     if (!printContent) return;
 
-    const title = activeReport === 'trip' 
-        ? `Relatório de Viagem - ${tripReportData?.trip.nome_viagem}` 
-        : `Aniversariantes - ${months.find(m => m.value === selectedMonth)?.label}`;
+    let title = "Relatório";
+    if (activeReport === 'trip') title = `Relatório de Viagem - ${tripReportData?.trip.nome_viagem}`;
+    else if (activeReport === 'birthday') title = `Aniversariantes - ${months.find(m => m.value === selectedMonth)?.label}`;
+    else if (activeReport === 'hotel') title = `Hotéis - ${selectedCountry}`;
 
     const printWindow = window.open('', '', 'width=900,height=600');
     if (!printWindow) return;
@@ -256,10 +315,10 @@ const ReportsTab: React.FC = () => {
     <div className="space-y-6">
       
       {/* TABS SWITCHER */}
-      <div className="flex space-x-4 border-b border-gray-200">
+      <div className="flex space-x-4 border-b border-gray-200 overflow-x-auto">
           <button
-            onClick={() => { setActiveReport('trip'); setBirthdayClients(null); }}
-            className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+            onClick={() => { setActiveReport('trip'); setBirthdayClients(null); setHotelReportData(null); }}
+            className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${
                 activeReport === 'trip' 
                 ? 'border-primary text-primary' 
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -269,8 +328,8 @@ const ReportsTab: React.FC = () => {
             Lista de Passageiros
           </button>
           <button
-            onClick={() => { setActiveReport('birthday'); setTripReportData(null); }}
-            className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+            onClick={() => { setActiveReport('birthday'); setTripReportData(null); setHotelReportData(null); }}
+            className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${
                 activeReport === 'birthday' 
                 ? 'border-primary text-primary' 
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -278,6 +337,17 @@ const ReportsTab: React.FC = () => {
           >
             <Cake size={18} />
             Aniversariantes
+          </button>
+          <button
+            onClick={() => { setActiveReport('hotel'); setTripReportData(null); setBirthdayClients(null); }}
+            className={`py-2 px-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${
+                activeReport === 'hotel' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Building2 size={18} />
+            Hotéis por País
           </button>
       </div>
 
@@ -354,8 +424,48 @@ const ReportsTab: React.FC = () => {
          </div>
       )}
 
+      {/* HOTEL REPORT CONTROLS */}
+      {activeReport === 'hotel' && (
+         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 animate-fade-in">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Globe className="text-primary" size={20} />
+                Relatório de Hotéis
+            </h3>
+            <div className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="w-full md:w-1/3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Selecione o País</label>
+                    <select
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-primary focus:outline-none"
+                        value={selectedCountry}
+                        onChange={(e) => {
+                            setSelectedCountry(e.target.value);
+                            setHotelReportData(null);
+                        }}
+                    >
+                        <option value="">-- Selecione um País --</option>
+                        {hotelCountries.map(country => (
+                            <option key={country} value={country}>{country}</option>
+                        ))}
+                    </select>
+                    {hotelCountries.length === 0 && (
+                        <p className="text-xs text-gray-400 mt-1">Nenhum país cadastrado nos hotéis.</p>
+                    )}
+                </div>
+                
+                <button
+                    onClick={generateHotelReport}
+                    disabled={!selectedCountry || loading}
+                    className="px-6 py-2 bg-primary text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                    {loading ? 'Buscando...' : 'Gerar Relatório'}
+                    <ChevronRight size={16} />
+                </button>
+            </div>
+         </div>
+      )}
+
       {/* REPORT PREVIEW AREA */}
-      {(tripReportData || birthdayClients) && (
+      {(tripReportData || birthdayClients || hotelReportData) && (
         <div className="animate-fade-in">
           <div className="flex justify-end mb-4">
             <button
@@ -369,22 +479,27 @@ const ReportsTab: React.FC = () => {
 
           <div id="printable-area" className="bg-white p-8 shadow-lg border border-gray-200 rounded-none max-w-[210mm] mx-auto min-h-[297mm]">
             
+            {/* HEADER PADRÃO */}
+            <div className="border-b-2 border-primary pb-2 mb-4">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h1 className="text-xl font-bold text-gray-900 uppercase">
+                            {tripReportData ? 'Relatório de Viagem' : 
+                             birthdayClients ? 'Relatório de Aniversariantes' : 
+                             'Histórico de Hotéis'}
+                        </h1>
+                        <p className="text-xs text-gray-500">Neto Almudi Viagens</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] text-gray-500">Emissão</p>
+                        <p className="font-mono text-xs font-medium">{new Date().toLocaleString('pt-BR')}</p>
+                    </div>
+                </div>
+            </div>
+            
             {/* TRIP REPORT VIEW */}
             {tripReportData && (
                 <>
-                    <div className="border-b-2 border-primary pb-2 mb-4">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h1 className="text-xl font-bold text-gray-900 uppercase">Relatório de Viagem</h1>
-                                <p className="text-xs text-gray-500">Neto Almudi Viagens</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[10px] text-gray-500">Emissão</p>
-                                <p className="font-mono text-xs font-medium">{new Date().toLocaleString('pt-BR')}</p>
-                            </div>
-                        </div>
-                    </div>
-
                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-6 text-xs">
                         <div className="flex justify-between items-start mb-3 border-b border-gray-200 pb-2">
                             <div>
@@ -496,21 +611,11 @@ const ReportsTab: React.FC = () => {
             {/* BIRTHDAY REPORT VIEW */}
             {birthdayClients && (
                 <>
-                    <div className="border-b-2 border-pink-500 pb-2 mb-6">
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <Cake className="text-pink-500" size={32} />
-                                <div>
-                                    <h1 className="text-xl font-bold text-gray-900 uppercase">Aniversariantes</h1>
-                                    <p className="text-sm font-medium text-pink-600">
-                                        Mês de {months.find(m => m.value === selectedMonth)?.label}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[10px] text-gray-500">Neto Almudi Viagens</p>
-                                <p className="font-mono text-xs font-medium">{new Date().toLocaleDateString('pt-BR')}</p>
-                            </div>
+                    <div className="bg-pink-50 p-4 rounded mb-6 flex items-center gap-3 border border-pink-100">
+                        <Cake className="text-pink-500" size={24} />
+                        <div>
+                            <p className="text-xs uppercase text-pink-500 font-bold">Mês Selecionado</p>
+                            <h2 className="text-xl font-bold text-gray-900">{months.find(m => m.value === selectedMonth)?.label}</h2>
                         </div>
                     </div>
 
@@ -555,6 +660,78 @@ const ReportsTab: React.FC = () => {
                                     })}
                                 </tbody>
                             </table>
+                        </>
+                    )}
+                </>
+            )}
+
+            {/* HOTEL REPORT VIEW */}
+            {hotelReportData && (
+                <>
+                    <div className="bg-blue-50 p-4 rounded mb-6 flex items-center gap-3 border border-blue-100">
+                        <Globe className="text-primary" size={24} />
+                        <div>
+                            <p className="text-xs uppercase text-primary font-bold">País Filtrado</p>
+                            <h2 className="text-xl font-bold text-gray-900">{selectedCountry}</h2>
+                        </div>
+                    </div>
+
+                    {hotelReportData.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 bg-gray-50 rounded border border-gray-100">
+                            Nenhum hotel encontrado para este país.
+                        </div>
+                    ) : (
+                        <>
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-100 border-b border-gray-200 text-[10px] uppercase text-gray-600">
+                                        <th className="py-2 px-2 font-bold">Hotel</th>
+                                        <th className="py-2 px-2 font-bold">Check-in / Check-out</th>
+                                        <th className="py-2 px-2 font-bold">Vínculo (Viagem/Grupo)</th>
+                                        <th className="py-2 px-2 font-bold text-right">Valor (R$)</th>
+                                        <th className="py-2 px-2 font-bold text-right">Valor (€)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-[11px] text-gray-700 divide-y divide-gray-100">
+                                    {hotelReportData.map((hotel, index) => {
+                                        const vinculo = hotel.viagens?.nome_viagem 
+                                            ? `Viagem: ${hotel.viagens.nome_viagem}` 
+                                            : hotel.grupos_aereos?.nome_grupo 
+                                                ? `Grupo: ${hotel.grupos_aereos.nome_grupo}` 
+                                                : '-';
+                                        
+                                        return (
+                                            <tr key={hotel.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                <td className="py-2 px-2 font-bold">{hotel.nome_hotel}</td>
+                                                <td className="py-2 px-2">
+                                                    <div className="flex items-center gap-1">
+                                                        {formatDateFull(hotel.check_in)} 
+                                                        <ArrowRight size={10} className="text-gray-400" />
+                                                        {formatDateFull(hotel.check_out)}
+                                                    </div>
+                                                </td>
+                                                <td className="py-2 px-2 text-gray-500 italic">{vinculo}</td>
+                                                <td className="py-2 px-2 text-right font-mono">{formatCurrency(hotel.valor_total_brl, 'BRL')}</td>
+                                                <td className="py-2 px-2 text-right font-mono">{formatCurrency(hotel.valor_total_eur, 'EUR')}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                    
+                                    {/* Footer Totais */}
+                                    <tr className="bg-gray-100 font-bold border-t border-gray-300">
+                                        <td colSpan={3} className="py-2 px-2 text-right text-gray-600 uppercase">Totais</td>
+                                        <td className="py-2 px-2 text-right text-green-700">
+                                            {formatCurrency(hotelReportData.reduce((acc, h) => acc + Number(h.valor_total_brl), 0), 'BRL')}
+                                        </td>
+                                        <td className="py-2 px-2 text-right text-blue-700">
+                                            {formatCurrency(hotelReportData.reduce((acc, h) => acc + Number(h.valor_total_eur), 0), 'EUR')}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p className="text-[9px] text-gray-400 mt-2 text-right">
+                                * Ordenado pela data de check-in mais recente.
+                            </p>
                         </>
                     )}
                 </>
