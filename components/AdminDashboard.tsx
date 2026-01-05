@@ -396,16 +396,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           <title>Emissão Aérea - ${group.nome_grupo}</title>
           <style>
             @media print {
-              body { font-family: sans-serif; padding: 10px; font-size: 8px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-              th, td { border: 1px solid #000; padding: 1px 3px; text-align: left; }
-              th { background-color: #eee; text-transform: uppercase; font-size: 8px; font-weight: bold; }
-              h1 { font-size: 11px; margin-bottom: 5px; }
-              p { margin: 2px 0; }
-              .header { margin-bottom: 10px; border-bottom: 1px solid #000; padding-bottom: 5px; }
+              body { font-family: sans-serif; padding: 10px; font-size: 10px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              /* Force font size on cells to ensure list is small */
+              th, td { 
+                border: 1px solid #000; 
+                padding: 4px; 
+                text-align: left; 
+                font-size: 10px !important; 
+              }
+              th { 
+                background-color: #eee; 
+                text-transform: uppercase; 
+                font-weight: bold; 
+              }
+              h1 { font-size: 14px; margin-bottom: 5px; }
+              p { margin: 2px 0; font-size: 10px; }
+              .header { margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 5px; }
               .uppercase { text-transform: uppercase; }
-              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 10px; }
             }
+            /* Default styles for preview */
             body { font-family: sans-serif; padding: 20px; font-size: 12px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
