@@ -3,6 +3,7 @@ import { supabase } from '../db/database';
 import { AirGroup, Client } from '../types';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
+import HotelManager from './HotelManager';
 import { ArrowLeft, Save, Users, Search, Plus, Trash2, Clock, Plane, MapPin } from 'lucide-react';
 
 interface AirGroupFormProps {
@@ -323,6 +324,15 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
             </div>
           )}
         </div>
+
+        {/* HOTEL MANAGER INTEGRATION */}
+        {initialData?.id ? (
+          <HotelManager parentId={initialData.id} parentType="grupo" />
+        ) : (
+          <div className="mt-8 p-6 bg-gray-50 border border-gray-200 border-dashed rounded-lg text-center">
+            <p className="text-gray-500">Salve o grupo aéreo para poder adicionar reservas de hotéis.</p>
+          </div>
+        )}
 
         <div className="flex justify-end pt-4 gap-3">
           <button 
