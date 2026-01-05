@@ -396,13 +396,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           <title>Emissão Aérea - ${group.nome_grupo}</title>
           <style>
             @media print {
-              body { font-family: sans-serif; padding: 15px; font-size: 10px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              th, td { border: 1px solid #000; padding: 3px 5px; text-align: left; }
-              th { background-color: #eee; text-transform: uppercase; font-size: 10px; font-weight: bold; }
-              h1 { font-size: 14px; margin-bottom: 5px; }
+              body { font-family: sans-serif; padding: 10px; font-size: 9px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+              th, td { border: 1px solid #000; padding: 2px 4px; text-align: left; }
+              th { background-color: #eee; text-transform: uppercase; font-size: 9px; font-weight: bold; }
+              h1 { font-size: 12px; margin-bottom: 5px; }
               p { margin: 2px 0; }
-              .header { margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 10px; }
+              .header { margin-bottom: 10px; border-bottom: 1px solid #000; padding-bottom: 5px; }
               .uppercase { text-transform: uppercase; }
               .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
             }
