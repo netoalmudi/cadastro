@@ -71,6 +71,18 @@ export interface AirGroup {
   destino?: string;
 }
 
+export interface Hotel {
+  id: number;
+  created_at?: string;
+  nome_hotel: string;
+  check_in: string;
+  check_out: string;
+  valor_total_brl: number | string;
+  valor_total_eur: number | string;
+  viagem_id?: number | null;
+  grupo_id?: number | null;
+}
+
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   className?: string;
