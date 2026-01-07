@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { X, Printer, User, CheckSquare, Square, Upload, Image as ImageIcon, CreditCard } from 'lucide-react';
 import { Client, AirGroup } from '../types';
@@ -79,7 +80,14 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
       .eq('grupo_id', group.id);
 
     if (data && !error) {
-      const formatted = data.map((d: any) => d.clientes).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+      // Mapeia os dados e ordena por nome
+      const formatted = data
+        .map((d: any) => ({
+             ...d.clientes,
+             dataNascimento: d.clientes.data_nascimento || d.clientes.dataNascimento,
+             ufRg: d.clientes.uf_rg || d.clientes.ufRg
+        }))
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
       setPassengers(formatted);
     }
     setLoading(false);
@@ -109,14 +117,19 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
           nomeTitular: `${passenger.nome} ${passenger.sobrenome}`.toUpperCase(),
           cpfTitular: passenger.cpf,
           rgTitular: passenger.rg || '',
-          dataNascimentoTitular: passenger.data_nascimento || passenger.dataNascimento || '',
+          dataNascimentoTitular: passenger.dataNascimento || '',
           telefoneTitular: passenger.celular
         }));
 
-        // Tentar carregar imagens do cadastro
-        setImgDoc(passenger.rg_url || passenger.passaporte_url || '');
-        setImgCardFront(passenger.cartao_credito_frente_url || '');
-        setImgCardBack(passenger.cartao_credito_verso_url || '');
+        // Lógica para carregar as imagens do banco
+        // Verifica primeiro rg_url, se não tiver, tenta passaporte_url
+        const docImage = passenger.rg_url || passenger.passaporte_url || '';
+        const cardFront = passenger.cartao_credito_frente_url || '';
+        const cardBack = passenger.cartao_credito_verso_url || '';
+
+        setImgDoc(docImage);
+        setImgCardFront(cardFront);
+        setImgCardBack(cardBack);
       }
     }
   };
@@ -154,11 +167,11 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
     const printWindow = window.open('', '', 'width=900,height=1000');
     if (!printWindow) return;
 
-    // Helper para checkbox visual
+    // Helper para checkbox visual - ALTERADO PARA USAR 'X'
     const CheckBox = (checked: boolean, label: string) => `
       <div style="display: flex; align-items: center; gap: 5px; margin-right: 15px;">
-        <div style="width: 16px; height: 16px; border: 2px solid #E63946; display: flex; align-items: center; justify-content: center;">
-          ${checked ? '<div style="width: 10px; height: 10px; background-color: #E63946;"></div>' : ''}
+        <div style="width: 16px; height: 16px; border: 2px solid #E63946; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #E63946; line-height: 1;">
+          ${checked ? 'X' : '&nbsp;'}
         </div>
         <span style="font-weight: bold; font-size: 12px;">${label}</span>
       </div>
@@ -196,17 +209,17 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
         
         <div style="margin-bottom: 30px;">
            <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">Documento de Identificação do Titular</h3>
-           ${imgDoc ? `<img src="${imgDoc}" style="max-width: 90%; max-height: 350px; border: 1px solid #ddd;" />` : '<p style="color: #999;">[Nenhum documento anexado]</p>'}
+           ${imgDoc ? `<img src="${imgDoc}" style="max-width: 90%; max-height: 350px; border: 1px solid #ddd; display: block; margin: 0 auto;" />` : '<p style="color: #999;">[Nenhum documento anexado]</p>'}
         </div>
 
         <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px;">
            <div style="flex: 1; min-width: 300px;">
               <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">Cartão de Crédito - Frente</h3>
-              ${imgCardFront ? `<img src="${imgCardFront}" style="max-width: 100%; max-height: 250px; border: 1px solid #ddd;" />` : '<p style="color: #999;">[Nenhuma imagem anexada]</p>'}
+              ${imgCardFront ? `<img src="${imgCardFront}" style="max-width: 100%; max-height: 250px; border: 1px solid #ddd; display: block; margin: 0 auto;" />` : '<p style="color: #999;">[Nenhuma imagem anexada]</p>'}
            </div>
            <div style="flex: 1; min-width: 300px;">
               <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">Cartão de Crédito - Verso</h3>
-              ${imgCardBack ? `<img src="${imgCardBack}" style="max-width: 100%; max-height: 250px; border: 1px solid #ddd;" />` : '<p style="color: #999;">[Nenhuma imagem anexada]</p>'}
+              ${imgCardBack ? `<img src="${imgCardBack}" style="max-width: 100%; max-height: 250px; border: 1px solid #ddd; display: block; margin: 0 auto;" />` : '<p style="color: #999;">[Nenhuma imagem anexada]</p>'}
            </div>
         </div>
 
@@ -219,7 +232,7 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
           <title>Autorização de Débito</title>
           <style>
             @page { size: A4; margin: 10mm; }
-            body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; padding: 0; }
+            body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .header { background-color: #333; color: white; text-align: center; padding: 8px; font-size: 16px; font-weight: bold; margin-bottom: 10px; }
             .row { display: flex; width: 100%; gap: 10px; align-items: flex-end; margin-bottom: 4px; }
             .section-title { background-color: #333; color: white; padding: 4px 8px; font-weight: bold; font-size: 11px; margin-top: 15px; margin-bottom: 10px; }
@@ -231,6 +244,7 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
             
             @media print {
               .page-break { page-break-before: always; }
+              img { max-width: 100% !important; }
             }
           </style>
         </head>
@@ -344,7 +358,7 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
           ${(imgDoc || imgCardFront || imgCardBack) ? attachmentsPage : ''}
 
           <script>
-            setTimeout(() => { window.print(); window.close(); }, 500);
+            setTimeout(() => { window.print(); window.close(); }, 800);
           </script>
         </body>
       </html>

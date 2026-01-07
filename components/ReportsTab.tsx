@@ -76,7 +76,7 @@ const ReportsTab: React.FC = () => {
 
     if (!error && data) {
         // Extract unique countries
-        const countries = Array.from(new Set(data.map((item: any) => item.pais))).sort();
+        const countries = Array.from(new Set(data.map((item: any) => item.pais as string))).sort();
         setHotelCountries(countries);
     }
   };
