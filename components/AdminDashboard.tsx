@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip, AirGroup } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar, FileSignature, ChevronLeft, ChevronRight, Bed } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar, FileSignature, ChevronLeft, ChevronRight, Bed, MapPin } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
 import AirGroupForm from './AirGroupForm';
 import ReportsTab from './ReportsTab';
 import HotelsTab from './HotelsTab';
+import DebitAuthModal from './DebitAuthModal'; // IMPORTADO
 import { formatCurrency, numberToExtenso } from '../utils/currencyUtils';
 
 interface AdminDashboardProps {
@@ -30,6 +31,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // State for Air Groups
   const [airGroups, setAirGroups] = useState<AirGroup[]>([]);
   const [editingAirGroup, setEditingAirGroup] = useState<AirGroup | null>(null);
+
+  // AUTH MODAL STATE
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [selectedGroupForAuth, setSelectedGroupForAuth] = useState<AirGroup | null>(null);
 
   // Common State
   const [activeTab, setActiveTab] = useState<TabView>('clients');
@@ -560,6 +565,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-6">
+        
+        {/* MODAL DE AUTORIZAÇÃO */}
+        <DebitAuthModal 
+            isOpen={showAuthModal} 
+            onClose={() => setShowAuthModal(false)} 
+            group={selectedGroupForAuth}
+        />
+
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <div>
@@ -929,7 +942,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                          </button>
                                          
                                          <button 
-                                            onClick={() => alert("Funcionalidade em desenvolvimento: Autorização de Débito")}
+                                            onClick={() => {
+                                              setSelectedGroupForAuth(group);
+                                              setShowAuthModal(true);
+                                            }}
                                             className="flex-1 md:flex-none px-4 py-2 bg-white text-blue-700 border border-blue-200 rounded-md hover:bg-blue-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
                                             title="Gerar Autorização de Débito"
                                          >
