@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Printer, User, CheckSquare, Square } from 'lucide-react';
+import { X, Printer, User, CheckSquare, Square, Upload, Image as ImageIcon, CreditCard } from 'lucide-react';
 import { Client, AirGroup } from '../types';
 import { supabase } from '../db/database';
 
@@ -17,6 +17,11 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
   const [titularId, setTitularId] = useState<string>('manual');
   const [selectedTravelers, setSelectedTravelers] = useState<string[]>([]);
   
+  // Image States (URL or Base64)
+  const [imgDoc, setImgDoc] = useState<string>('');
+  const [imgCardFront, setImgCardFront] = useState<string>('');
+  const [imgCardBack, setImgCardBack] = useState<string>('');
+
   const [formData, setFormData] = useState({
     dataEmissao: new Date().toLocaleDateString('pt-BR'),
     cartaoTipo: '',
@@ -59,6 +64,9 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
       }));
       setTitularId('manual');
       setSelectedTravelers([]);
+      setImgDoc('');
+      setImgCardFront('');
+      setImgCardBack('');
     }
   }, [isOpen, group]);
 
@@ -90,6 +98,9 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
         dataNascimentoTitular: '',
         telefoneTitular: ''
       }));
+      setImgDoc('');
+      setImgCardFront('');
+      setImgCardBack('');
     } else {
       const passenger = passengers.find(p => p.id.toString() === id);
       if (passenger) {
@@ -101,6 +112,11 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
           dataNascimentoTitular: passenger.data_nascimento || passenger.dataNascimento || '',
           telefoneTitular: passenger.celular
         }));
+
+        // Tentar carregar imagens do cadastro
+        setImgDoc(passenger.rg_url || passenger.passaporte_url || '');
+        setImgCardFront(passenger.cartao_credito_frente_url || '');
+        setImgCardBack(passenger.cartao_credito_verso_url || '');
       }
     }
   };
@@ -108,6 +124,18 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Processar upload de imagem local para Base64 (para exibição na impressão)
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setImage: (val: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const toggleTraveler = (name: string) => {
@@ -158,6 +186,33 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
       `;
     }
 
+    // HTML da Segunda Página (Anexos)
+    const attachmentsPage = `
+      <div class="page-break"></div>
+      <div class="header">
+        ANEXOS - DOCUMENTOS COMPROBATÓRIOS
+      </div>
+      <div style="padding: 20px; text-align: center;">
+        
+        <div style="margin-bottom: 30px;">
+           <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">Documento de Identificação do Titular</h3>
+           ${imgDoc ? `<img src="${imgDoc}" style="max-width: 90%; max-height: 350px; border: 1px solid #ddd;" />` : '<p style="color: #999;">[Nenhum documento anexado]</p>'}
+        </div>
+
+        <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px;">
+           <div style="flex: 1; min-width: 300px;">
+              <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">Cartão de Crédito - Frente</h3>
+              ${imgCardFront ? `<img src="${imgCardFront}" style="max-width: 100%; max-height: 250px; border: 1px solid #ddd;" />` : '<p style="color: #999;">[Nenhuma imagem anexada]</p>'}
+           </div>
+           <div style="flex: 1; min-width: 300px;">
+              <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">Cartão de Crédito - Verso</h3>
+              ${imgCardBack ? `<img src="${imgCardBack}" style="max-width: 100%; max-height: 250px; border: 1px solid #ddd;" />` : '<p style="color: #999;">[Nenhuma imagem anexada]</p>'}
+           </div>
+        </div>
+
+      </div>
+    `;
+
     const htmlContent = `
       <html>
         <head>
@@ -173,10 +228,15 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
             .footer-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
             .footer-box { border: 1px solid #000; padding: 10px; vertical-align: top; }
             .red-border { border: 2px solid #E63946; }
+            
+            @media print {
+              .page-break { page-break-before: always; }
+            }
           </style>
         </head>
         <body>
           
+          <!-- PAGINA 1: FORMULÁRIO -->
           <div class="header">
             Autorização de Débito - Serviços de Viagens
           </div>
@@ -280,6 +340,9 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
             </tr>
           </table>
 
+          <!-- PAGINA 2: ANEXOS (Se houver alguma imagem) -->
+          ${(imgDoc || imgCardFront || imgCardBack) ? attachmentsPage : ''}
+
           <script>
             setTimeout(() => { window.print(); window.close(); }, 500);
           </script>
@@ -365,6 +428,33 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
                />
             </div>
 
+            {/* SEÇÃO DE IMAGEM DO DOCUMENTO */}
+            <div className="bg-gray-50 p-2 rounded border border-gray-200">
+                <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                        <ImageIcon size={12}/> Documento Titular
+                    </label>
+                    {imgDoc ? (
+                        <span className="text-xs text-green-600 flex items-center gap-1"><CheckSquare size={12}/> Anexado</span>
+                    ) : (
+                        <span className="text-xs text-gray-400">Pendente</span>
+                    )}
+                </div>
+                {!imgDoc ? (
+                     <label className="flex items-center justify-center gap-2 p-2 border border-dashed border-gray-300 rounded cursor-pointer hover:bg-white transition-colors text-xs text-gray-500">
+                        <Upload size={14} /> Carregar Imagem
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, setImgDoc)} />
+                     </label>
+                ) : (
+                     <div className="relative group">
+                        <img src={imgDoc} className="h-20 w-auto object-contain mx-auto border bg-white" alt="Doc" />
+                        <button onClick={() => setImgDoc('')} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                            <X size={12} />
+                        </button>
+                     </div>
+                )}
+            </div>
+
             <h3 className="font-bold text-gray-700 border-b pb-2 mt-6">Dados do Cartão</h3>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Bandeira</label>
@@ -391,6 +481,49 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
             <div className="grid grid-cols-2 gap-3">
               <input className="border rounded p-2 text-sm" placeholder="Validade (MM/AA)" name="validadeCartao" value={formData.validadeCartao} onChange={handleInputChange} />
               <input className="border rounded p-2 text-sm" placeholder="Cód. Segurança" name="codigoSeguranca" value={formData.codigoSeguranca} onChange={handleInputChange} />
+            </div>
+
+            {/* SEÇÃO DE IMAGENS DO CARTÃO */}
+            <div className="grid grid-cols-2 gap-2">
+                 {/* FRENTE */}
+                 <div className="bg-gray-50 p-2 rounded border border-gray-200">
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="text-xs font-bold text-gray-600 flex items-center gap-1"><CreditCard size={12}/> Frente</label>
+                    </div>
+                    {!imgCardFront ? (
+                        <label className="flex items-center justify-center gap-2 p-2 border border-dashed border-gray-300 rounded cursor-pointer hover:bg-white transition-colors text-xs text-gray-500 h-16">
+                            <Upload size={14} />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, setImgCardFront)} />
+                        </label>
+                    ) : (
+                        <div className="relative group">
+                            <img src={imgCardFront} className="h-16 w-full object-contain bg-white border" alt="Frente" />
+                            <button onClick={() => setImgCardFront('')} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                <X size={12} />
+                            </button>
+                        </div>
+                    )}
+                 </div>
+
+                 {/* VERSO */}
+                 <div className="bg-gray-50 p-2 rounded border border-gray-200">
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="text-xs font-bold text-gray-600 flex items-center gap-1"><CreditCard size={12}/> Verso</label>
+                    </div>
+                    {!imgCardBack ? (
+                        <label className="flex items-center justify-center gap-2 p-2 border border-dashed border-gray-300 rounded cursor-pointer hover:bg-white transition-colors text-xs text-gray-500 h-16">
+                            <Upload size={14} />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, setImgCardBack)} />
+                        </label>
+                    ) : (
+                        <div className="relative group">
+                            <img src={imgCardBack} className="h-16 w-full object-contain bg-white border" alt="Verso" />
+                            <button onClick={() => setImgCardBack('')} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                <X size={12} />
+                            </button>
+                        </div>
+                    )}
+                 </div>
             </div>
           </div>
 
