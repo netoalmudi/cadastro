@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { X, Printer, User, CheckSquare, Square, Upload, Image as ImageIcon, CreditCard } from 'lucide-react';
 import { Client, AirGroup } from '../types';
@@ -167,10 +166,10 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
     const printWindow = window.open('', '', 'width=900,height=1000');
     if (!printWindow) return;
 
-    // Helper para checkbox visual - ALTERADO PARA USAR 'X'
+    // Helper para checkbox visual - Usando 'X' para marcar
     const CheckBox = (checked: boolean, label: string) => `
       <div style="display: flex; align-items: center; gap: 5px; margin-right: 15px;">
-        <div style="width: 16px; height: 16px; border: 2px solid #E63946; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #E63946; line-height: 1;">
+        <div style="width: 18px; height: 18px; border: 2px solid #E63946; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #E63946; line-height: 1;">
           ${checked ? 'X' : '&nbsp;'}
         </div>
         <span style="font-weight: bold; font-size: 12px;">${label}</span>
