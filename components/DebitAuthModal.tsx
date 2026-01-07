@@ -299,12 +299,12 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
 
           <div class="row">
             ${InputBox('Cia. Aérea:', formData.ciaAerea, '30%')}
-            ${InputBox('Trecho aéreo e data da viagem:', `${formData.trecho} - ${formData.dataViagem}`, '70%')}
+            ${InputBox('Trecho aéreo:', formData.trecho, '70%')}
           </div>
 
           <div class="row">
             ${InputBox('Cód. Aut.:', formData.codAut, '30%')}
-            ${InputBox('Data:', formData.dataAuth, '30%')}
+            ${InputBox('Data:', formData.dataViagem, '30%')}
           </div>
 
           <div class="row">

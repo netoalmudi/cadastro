@@ -77,7 +77,7 @@ const ReportsTab: React.FC = () => {
     if (!error && data) {
         // Extract unique countries
         // Explicitly cast to string[] to resolve TS error
-        const countries = Array.from(new Set(data.map((item: any) => String(item.pais)))).sort();
+        const countries = Array.from(new Set(data.map((item: any) => String(item.pais)))).sort() as string[];
         setHotelCountries(countries);
     }
   };
@@ -535,7 +535,7 @@ const ReportsTab: React.FC = () => {
                                 <p className="text-[10px] text-gray-500 uppercase">Data/Hora Partida</p>
                                 <p className="font-semibold text-gray-900 flex items-center gap-1">
                                     <Calendar size={10} /> 
-                                    {new Date(tripReportData.trip.data_ida).toLocaleDateString('pt-BR')} 
+                                    {new Date(tripReportData.trip.data_ida).toLocaleDateString('pt-BR') || '-'} 
                                     <Clock size={10} className="ml-1" /> {tripReportData.trip.hora_ida}
                                 </p>
                             </div>
