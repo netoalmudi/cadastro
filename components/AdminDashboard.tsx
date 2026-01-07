@@ -929,6 +929,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                          </button>
                                          
                                          <button 
+                                            onClick={() => alert("Funcionalidade em desenvolvimento: Autorização de Débito")}
+                                            className="flex-1 md:flex-none px-4 py-2 bg-white text-blue-700 border border-blue-200 rounded-md hover:bg-blue-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                            title="Gerar Autorização de Débito"
+                                         >
+                                            <CreditCard size={16} /> Autorização de Débito
+                                         </button>
+
+                                         <button 
                                             onClick={() => handleEditAirGroup(group)}
                                             className="flex-1 md:flex-none px-4 py-2 bg-white/50 border border-gray-300 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-medium flex items-center justify-center gap-2"
                                          >
