@@ -166,21 +166,24 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
     const printWindow = window.open('', '', 'width=900,height=1000');
     if (!printWindow) return;
 
+    // Definição da cor Azul
+    const BLUE_COLOR = '#0056b3';
+
     // Helper para checkbox visual - Usando 'X' para marcar
     const CheckBox = (checked: boolean, label: string) => `
       <div style="display: flex; align-items: center; gap: 5px; margin-right: 15px;">
-        <div style="width: 18px; height: 18px; border: 2px solid #E63946; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: #E63946; line-height: 1;">
+        <div style="width: 18px; height: 18px; border: 2px solid ${BLUE_COLOR}; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: ${BLUE_COLOR}; line-height: 1;">
           ${checked ? 'X' : '&nbsp;'}
         </div>
         <span style="font-weight: bold; font-size: 12px;">${label}</span>
       </div>
     `;
 
-    // Helper para Input visual (linha vermelha ou caixa)
+    // Helper para Input visual
     const InputBox = (label: string, value: string, width: string = '100%') => `
       <div style="display: flex; flex-direction: row; align-items: flex-end; width: ${width}; margin-bottom: 5px;">
         <span style="font-weight: bold; font-size: 11px; white-space: nowrap; margin-right: 5px;">${label}</span>
-        <div style="border: 2px solid #E63946; padding: 2px 5px; flex-grow: 1; min-height: 18px; font-size: 12px; font-family: monospace;">
+        <div style="border: 2px solid ${BLUE_COLOR}; padding: 2px 5px; flex-grow: 1; min-height: 18px; font-size: 12px; font-family: monospace;">
           ${value || '&nbsp;'}
         </div>
       </div>
@@ -193,7 +196,7 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
       travelersRows += `
         <tr>
           <td style="border: 1px solid #000; padding: 2px 5px; width: 20px; text-align: center;">${i + 1}.</td>
-          <td style="border: 1px solid #000; padding: 2px 5px; height: 18px; border: 2px solid #E63946;">${name.toUpperCase()}</td>
+          <td style="border: 1px solid #000; padding: 2px 5px; height: 18px; border: 2px solid ${BLUE_COLOR};">${name.toUpperCase()}</td>
         </tr>
       `;
     }
@@ -239,7 +242,7 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
             .legal-text { font-size: 10px; text-align: justify; line-height: 1.3; margin-bottom: 15px; }
             .footer-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
             .footer-box { border: 1px solid #000; padding: 10px; vertical-align: top; }
-            .red-border { border: 2px solid #E63946; }
+            .colored-border { border: 2px solid ${BLUE_COLOR}; }
             
             @media print {
               .page-break { page-break-before: always; }
@@ -256,7 +259,7 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
 
           <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px;">
             <span style="font-weight: bold; margin-right: 5px;">Data de emissão:</span>
-            <div style="border: 2px solid #E63946; width: 150px; padding: 3px; text-align: center;">${formData.dataEmissao}</div>
+            <div style="border: 2px solid ${BLUE_COLOR}; width: 150px; padding: 3px; text-align: center;">${formData.dataEmissao}</div>
           </div>
 
           <div style="display: flex; justify-content: center; margin-bottom: 20px;">
