@@ -317,7 +317,7 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
           </div>
 
           <div class="row">
-            ${InputBox('Valor total sem Taxa:', formData.valorTotal, '33%')}
+            ${InputBox('Valor Total:', formData.valorTotal, '33%')}
             ${InputBox('Valor das taxas:', formData.valorTaxas, '33%')}
             ${InputBox('Valor de cada parcela:', formData.valorParcela, '34%')}
           </div>
@@ -325,7 +325,7 @@ const DebitAuthModal: React.FC<DebitAuthModalProps> = ({ isOpen, onClose, group 
           <div class="attention">ATENÇÃO</div>
 
           <div class="legal-text">
-            <p><strong>Qualquer</strong></p>
+            <p><strong>Regras</strong></p>
             <p>Qualquer transação realizada fora dos padrões contratuais das Administradoras implicará em sanções legais, tanto para o portador como para à agência.</p>
             <p>Ao autorizar o debito no cartão de crédito, titular e Agência declaram estar cientes e concordam com as seguintes condições:</p>
             <p>1 - Questionamentos ou cancelamentos dos serviços adquiridos devem ser resolvidos entre as partes - Agência e titular.</p>

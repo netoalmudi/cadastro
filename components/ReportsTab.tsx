@@ -76,7 +76,8 @@ const ReportsTab: React.FC = () => {
 
     if (!error && data) {
         // Extract unique countries
-        const countries = Array.from(new Set(data.map((item: any) => item.pais as string))).sort();
+        // Explicitly cast to string[] to resolve TS error
+        const countries = Array.from(new Set(data.map((item: any) => String(item.pais)))).sort();
         setHotelCountries(countries);
     }
   };
