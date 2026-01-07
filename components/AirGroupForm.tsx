@@ -3,7 +3,7 @@ import { supabase } from '../db/database';
 import { AirGroup, Client } from '../types';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
-import { ArrowLeft, Save, Users, Search, Plus, Trash2, Clock, Plane, MapPin } from 'lucide-react';
+import { ArrowLeft, Save, Users, Search, Plus, Trash2, Clock, Plane, MapPin, Tag } from 'lucide-react';
 
 interface AirGroupFormProps {
   initialData?: AirGroup | null;
@@ -19,6 +19,12 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
     origem: '',
     destino: '',
   });
+
+  // Local state for split fields to handle IATA codes better
+  const [originCity, setOriginCity] = useState('');
+  const [originIata, setOriginIata] = useState('');
+  const [destCity, setDestCity] = useState('');
+  const [destIata, setDestIata] = useState('');
 
   const [selectedClientIds, setSelectedClientIds] = useState<(number | string)[]>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
@@ -37,6 +43,18 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Helper to parse "City (IATA)"
+  const parseLocation = (value: string) => {
+    if (!value) return { city: '', iata: '' };
+    // Regex to match "City Name (IATA)"
+    // Looks for 3 letters inside parentheses at the end of string
+    const match = value.match(/^(.*)\s*\((.{3})\)$/);
+    if (match) {
+      return { city: match[1].trim(), iata: match[2].toUpperCase() };
+    }
+    return { city: value, iata: '' };
+  };
+
   // Carrega dados iniciais se estiver editando
   useEffect(() => {
     if (initialData) {
@@ -46,6 +64,15 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
         origem: initialData.origem || '',
         destino: initialData.destino || '',
       });
+      
+      const parsedOrig = parseLocation(initialData.origem || '');
+      setOriginCity(parsedOrig.city);
+      setOriginIata(parsedOrig.iata);
+
+      const parsedDest = parseLocation(initialData.destino || '');
+      setDestCity(parsedDest.city);
+      setDestIata(parsedDest.iata);
+
       fetchGroupClients(initialData.id);
     }
   }, [initialData]);
@@ -90,6 +117,16 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
         return;
     }
 
+    // Construct final strings
+    const finalOrigem = originIata ? `${originCity} (${originIata.toUpperCase()})` : originCity;
+    const finalDestino = destIata ? `${destCity} (${destIata.toUpperCase()})` : destCity;
+
+    const payloadData = {
+        ...formData,
+        origem: finalOrigem,
+        destino: finalDestino,
+    };
+
     try {
       let groupId: number;
 
@@ -98,7 +135,7 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
         // Update
         const { error } = await supabase
           .from('grupos_aereos')
-          .update(formData)
+          .update(payloadData)
           .eq('id', initialData.id);
         
         if (error) throw error;
@@ -108,7 +145,7 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
         // Insert
         const { data, error } = await supabase
           .from('grupos_aereos')
-          .insert([formData])
+          .insert([payloadData])
           .select()
           .single();
         
@@ -185,29 +222,53 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
             className="md:col-span-2"
           />
           
-          {/* Origem e Destino */}
-          <div className="md:col-span-1">
-             <div className="relative">
-                <Input 
-                  label="Cidade Origem (Aeroporto)" 
-                  name="origem" 
-                  value={formData.origem} 
-                  onChange={handleChange} 
-                  placeholder="Ex: Curitiba (CWB)"
-                />
-                <MapPin className="absolute right-3 top-9 text-gray-400 w-4 h-4" />
+          {/* Origem e IATA */}
+          <div className="md:col-span-1 bg-gray-50 p-3 rounded-lg border border-gray-200">
+             <div className="flex gap-2">
+                <div className="flex-grow">
+                    <Input 
+                      label="Cidade Origem" 
+                      name="originCity" 
+                      value={originCity} 
+                      onChange={(e) => setOriginCity(e.target.value)} 
+                      placeholder="Ex: Curitiba"
+                    />
+                </div>
+                <div className="w-24">
+                     <Input 
+                      label="IATA" 
+                      name="originIata" 
+                      value={originIata} 
+                      onChange={(e) => setOriginIata(e.target.value.toUpperCase().slice(0, 3))} 
+                      placeholder="CWB"
+                      maxLength={3}
+                    />
+                </div>
              </div>
           </div>
-          <div className="md:col-span-1">
-             <div className="relative">
-                <Input 
-                  label="Cidade Destino (Aeroporto)" 
-                  name="destino" 
-                  value={formData.destino} 
-                  onChange={handleChange} 
-                  placeholder="Ex: Lisboa (LIS)"
-                />
-                <MapPin className="absolute right-3 top-9 text-gray-400 w-4 h-4" />
+
+          {/* Destino e IATA */}
+          <div className="md:col-span-1 bg-gray-50 p-3 rounded-lg border border-gray-200">
+             <div className="flex gap-2">
+                <div className="flex-grow">
+                    <Input 
+                      label="Cidade Destino" 
+                      name="destCity" 
+                      value={destCity} 
+                      onChange={(e) => setDestCity(e.target.value)} 
+                      placeholder="Ex: Lisboa"
+                    />
+                </div>
+                <div className="w-24">
+                     <Input 
+                      label="IATA" 
+                      name="destIata" 
+                      value={destIata} 
+                      onChange={(e) => setDestIata(e.target.value.toUpperCase().slice(0, 3))} 
+                      placeholder="LIS"
+                      maxLength={3}
+                    />
+                </div>
              </div>
           </div>
         </div>
