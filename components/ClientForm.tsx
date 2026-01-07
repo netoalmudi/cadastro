@@ -3,7 +3,7 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle, ArrowLeft, Eye, Image as ImageIcon } from 'lucide-react';
+import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle, ArrowLeft, Eye, CreditCard } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
 import { supabase, isSupabaseConfigured, configError } from '../db/database';
 import { Client, ClientFormData } from '../types';
@@ -46,8 +46,11 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
   const [signatureKey, setSignatureKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Tipos de arquivo suportados
+  type FileFieldType = 'arquivoRg' | 'arquivoPassaporte' | 'arquivoCartaoFrente' | 'arquivoCartaoVerso';
+
   // Estado para controlar qual arquivo está sendo processado (comprimido)
-  const [processingFile, setProcessingFile] = useState<'arquivoRg' | 'arquivoPassaporte' | null>(null);
+  const [processingFile, setProcessingFile] = useState<FileFieldType | null>(null);
   
   const initialFormData: ClientFormState = {
     nome: '',
@@ -72,11 +75,15 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
     assinatura: null,
     arquivoRg: null,
     arquivoPassaporte: null,
+    arquivoCartaoFrente: null,
+    arquivoCartaoVerso: null,
   };
 
   interface ClientFormState extends ClientFormData {
     arquivoRg: File | null;
     arquivoPassaporte: File | null;
+    arquivoCartaoFrente: File | null;
+    arquivoCartaoVerso: File | null;
   }
 
   // Se houver initialData (Modo Edição), popula o form
@@ -86,7 +93,9 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         ...initialFormData, // Defaults
         ...initialData, // Database values
         arquivoRg: null, // Files reset on edit unless re-uploaded
-        arquivoPassaporte: null
+        arquivoPassaporte: null,
+        arquivoCartaoFrente: null,
+        arquivoCartaoVerso: null,
       };
     }
     return initialFormData;
@@ -260,7 +269,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
     if (name === 'cep') fetchAddressByCEP(value);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'arquivoRg' | 'arquivoPassaporte') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: FileFieldType) => {
     const file = e.target.files?.[0];
     if (file) {
       setProcessingFile(fieldName);
@@ -400,12 +409,20 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
       
       let rgUrl = initialData?.rg_url || null;
       let passaporteUrl = initialData?.passaporte_url || null;
+      let cartaoFrenteUrl = initialData?.cartao_credito_frente_url || null;
+      let cartaoVersoUrl = initialData?.cartao_credito_verso_url || null;
 
       if (formData.arquivoRg) {
          rgUrl = await uploadFile(formData.arquivoRg, 'rg');
       }
       if (formData.arquivoPassaporte) {
          passaporteUrl = await uploadFile(formData.arquivoPassaporte, 'passaporte');
+      }
+      if (formData.arquivoCartaoFrente) {
+         cartaoFrenteUrl = await uploadFile(formData.arquivoCartaoFrente, 'cartao-frente');
+      }
+      if (formData.arquivoCartaoVerso) {
+         cartaoVersoUrl = await uploadFile(formData.arquivoCartaoVerso, 'cartao-verso');
       }
 
       const payload = {
@@ -431,7 +448,9 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         observacoes: formData.observacoes,
         assinatura: formData.assinatura,
         rg_url: rgUrl,
-        passaporte_url: passaporteUrl
+        passaporte_url: passaporteUrl,
+        cartao_credito_frente_url: cartaoFrenteUrl,
+        cartao_credito_verso_url: cartaoVersoUrl
       };
 
       if (initialData && initialData.id) {
@@ -467,7 +486,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
 
   // Helper para renderizar os botões de documento (Câmera e Arquivo)
   const renderDocumentUpload = (
-    fieldName: 'arquivoRg' | 'arquivoPassaporte',
+    fieldName: FileFieldType,
     label: string,
     existingUrl?: string
   ) => {
@@ -476,7 +495,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
     const hasExisting = !!existingUrl;
 
     return (
-      <div className="flex flex-col gap-3 w-full sm:w-auto p-4 border border-gray-200 rounded-lg bg-gray-50 shadow-sm">
+      <div className="flex flex-col gap-3 w-full sm:w-auto p-4 border border-gray-200 rounded-lg bg-gray-50 shadow-sm flex-1">
         <div className="flex justify-between items-start">
             <span className="text-sm font-bold text-gray-700">{label}</span>
             {isProcessing ? (
@@ -651,11 +670,21 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         </div>
 
         {/* DOCUMENTOS */}
-        <SectionHeader title="Documentos (Foto ou Arquivo)" />
-
-        <div className="flex flex-col sm:flex-row gap-6">
+        <SectionHeader title="Documentos Pessoais (Foto)" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {renderDocumentUpload('arquivoRg', 'Foto RG / CNH', initialData?.rg_url)}
           {renderDocumentUpload('arquivoPassaporte', 'Foto Passaporte', initialData?.passaporte_url)}
+        </div>
+
+        {/* CARTÃO DE CRÉDITO */}
+        <div className="flex items-center mb-6 mt-8 text-blue-800">
+           <div className="w-1.5 h-6 bg-blue-800 mr-3"></div>
+           <CreditCard className="mr-2" size={24} />
+           <h2 className="text-xl font-bold">Cartão de Crédito (Opcional)</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           {renderDocumentUpload('arquivoCartaoFrente', 'Frente do Cartão', initialData?.cartao_credito_frente_url)}
+           {renderDocumentUpload('arquivoCartaoVerso', 'Verso do Cartão', initialData?.cartao_credito_verso_url)}
         </div>
 
         {/* OBSERVAÇÕES */}

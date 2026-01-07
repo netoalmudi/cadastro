@@ -37,6 +37,8 @@ export interface Client extends ClientFormData {
   protocolo: string;
   rg_url?: string;
   passaporte_url?: string;
+  cartao_credito_frente_url?: string;
+  cartao_credito_verso_url?: string;
 }
 
 export interface Trip {
