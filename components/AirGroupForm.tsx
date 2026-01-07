@@ -4,6 +4,7 @@ import { AirGroup, Client } from '../types';
 import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import { ArrowLeft, Save, Users, Search, Plus, Trash2, Clock, Plane, MapPin, Tag } from 'lucide-react';
+import { getIataFromCity } from '../utils/airportDatabase';
 
 interface AirGroupFormProps {
   initialData?: AirGroup | null;
@@ -93,6 +94,19 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Handle City Change with Auto-IATA lookup
+  const handleCityChange = (value: string, type: 'origin' | 'dest') => {
+    if (type === 'origin') {
+        setOriginCity(value);
+        const code = getIataFromCity(value);
+        if (code) setOriginIata(code);
+    } else {
+        setDestCity(value);
+        const code = getIataFromCity(value);
+        if (code) setDestIata(code);
+    }
   };
 
   const addClient = (clientId: number | string) => {
@@ -230,7 +244,7 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
                       label="Cidade Origem" 
                       name="originCity" 
                       value={originCity} 
-                      onChange={(e) => setOriginCity(e.target.value)} 
+                      onChange={(e) => handleCityChange(e.target.value, 'origin')} 
                       placeholder="Ex: Curitiba"
                     />
                 </div>
@@ -255,7 +269,7 @@ const AirGroupForm: React.FC<AirGroupFormProps> = ({ initialData, availableClien
                       label="Cidade Destino" 
                       name="destCity" 
                       value={destCity} 
-                      onChange={(e) => setDestCity(e.target.value)} 
+                      onChange={(e) => handleCityChange(e.target.value, 'dest')} 
                       placeholder="Ex: Lisboa"
                     />
                 </div>
