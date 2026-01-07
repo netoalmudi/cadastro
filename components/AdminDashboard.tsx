@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../db/database';
 import { Client, Trip, AirGroup } from '../types';
-import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar, FileSignature, ChevronLeft, ChevronRight, Bed } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, X, RefreshCw, AlertCircle, Users, Map, FileText, Plane, Printer, CreditCard, Globe, Calendar, FileSignature, ChevronLeft, ChevronRight, Bed, MapPin } from 'lucide-react';
 import ClientForm from './ClientForm';
 import TripForm from './TripForm';
 import AirGroupForm from './AirGroupForm';
@@ -102,26 +102,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     setCurrentPage(1);
   }, [searchTerm, activeTab]);
 
-  // Helper para calcular idade
-  const calculateAge = (birthDate: string | undefined) => {
-    if (!birthDate) return null;
-    let dateObj: Date;
-    if (birthDate.includes('/')) {
-        const [day, month, year] = birthDate.split('/');
-        dateObj = new Date(Number(year), Number(month) - 1, Number(day));
-    } else {
-        dateObj = new Date(birthDate);
-    }
-    if (isNaN(dateObj.getTime())) return null;
-    const today = new Date();
-    let age = today.getFullYear() - dateObj.getFullYear();
-    const monthDiff = today.getMonth() - dateObj.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateObj.getDate())) {
-        age--;
-    }
-    return age;
-  };
-
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return '';
     // Assume formato YYYY-MM-DD vindo do banco
@@ -163,7 +143,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   };
 
   const handleGenerateContract = async (trip: Trip) => {
-    // ... (Code omitted for brevity, logic remains the same)
     if (!trip.contratante_id) {
         alert("Esta viagem não possui um Contratante definido. Edite a viagem e defina um Contratante (ícone de estrela na lista de passageiros).");
         return;
@@ -286,4 +265,357 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               <p>4.2 Instruir os passageiros quanto aos documentos de identificação exigidos na hora do embarque, de acordo com a Resolução 4.308/2014 da ANTT, cujo conteúdo o CONTRATANTE declara ter tomado ciência neste ato;</p>
               <p>4.3 Em especial, quando se tratar de viagem de menores: a) Crianças de colo - até 06 anos incompletos, documento: Certidão de Nascimento; b) Crianças até 12 anos incompletos, documento: CN ou RG; c) Adolescentes de 12 a 18 anos incompletos, documento de identificação: RG;</p>
               <p>4.4 Na lista de passageiros deverão constar os nomes completos, nº do RG ou Passaporte. Em caso de dados incorretos ou omissão de nomes o CONTRATANTE é responsável pelas multas que porventura venham a ocorrer;</p>
-              <p>4.5 Contratar o GUIA de TURISMO devidamente credenciado pela CADASTUR para a viagem durante a execução do serviço de deslocamento, o qual compromete-se a zelar pelo bom andamento da
+              <p>4.5 Contratar o GUIA de TURISMO devidamente credenciado pela CADASTUR para a viagem durante a execução do serviço de deslocamento, o qual compromete-se a zelar pelo bom andamento da viagem.</p>
+            </div>
+
+            <div class="signature-section">
+                <div class="signature-box">
+                <span class="bold">CONTRATADA</span><br>
+                DARIO ALMUDI NETO VIAGENS LTDA
+                </div>
+                <div class="signature-box">
+                <span class="bold">CONTRATANTE</span><br>
+                ${contractor.nome} ${contractor.sobrenome}
+                </div>
+            </div>
+
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+  };
+
+  // --- Handlers for Air Groups ---
+  const handleDeleteAirGroup = async (id: number) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    if (window.confirm("Tem certeza que deseja excluir este grupo aéreo?")) {
+      const { error } = await supabase.from('grupos_aereos').delete().eq('id', id);
+      if (error) alert("Erro: " + error.message);
+      else setAirGroups(prev => prev.filter(g => g.id !== id));
+    }
+  };
+
+  const handleEditAirGroup = (group: AirGroup) => {
+    setEditingAirGroup(group);
+    setMode('form');
+  };
+
+  const handlePrintAirList = async (group: AirGroup) => {
+    if (!supabase) return;
+    
+    // Fetch passengers
+    const { data, error } = await supabase
+      .from('grupo_aereo_clientes')
+      .select('cliente_id, clientes(*)')
+      .eq('grupo_id', group.id);
+
+    if (error) {
+      alert("Erro ao buscar passageiros.");
+      return;
+    }
+
+    const passengers = data.map((d: any) => d.clientes).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+
+    const printWindow = window.open('', '', 'width=900,height=600');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Lista Aérea - ${group.nome_grupo}</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            h1 { font-size: 18px; margin-bottom: 10px; }
+            h2 { font-size: 14px; color: #666; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+          </style>
+        </head>
+        <body>
+          <h1>${group.nome_grupo}</h1>
+          <h2>${group.origem || 'Origem'} ✈ ${group.destino || 'Destino'}</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nome Completo</th>
+                <th>CPF</th>
+                <th>Passaporte</th>
+                <th>Data Nasc.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${passengers.map((p: any, i: number) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${p.nome} ${p.sobrenome}</td>
+                  <td>${p.cpf}</td>
+                  <td>${p.passaporte || '-'}</td>
+                  <td>${p.data_nascimento || p.dataNascimento || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // --- Render Helpers ---
+
+  // Pagination Logic
+  const filterData = () => {
+    const term = searchTerm.toLowerCase();
+    if (activeTab === 'clients') {
+      return clients.filter(c => c.nome.toLowerCase().includes(term) || c.sobrenome.toLowerCase().includes(term) || c.cpf.includes(term));
+    } else if (activeTab === 'trips') {
+      return trips.filter(t => t.nome_viagem.toLowerCase().includes(term));
+    } else if (activeTab === 'air') {
+      return airGroups.filter(g => g.nome_grupo.toLowerCase().includes(term));
+    }
+    return [];
+  };
+
+  const filteredItems = filterData();
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+  const currentItems = filteredItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const handleLogout = () => {
+    if (window.confirm("Deseja sair da área administrativa?")) {
+        onLogout();
+    }
+  };
+
+  // If in Form Mode
+  if (mode === 'form') {
+    if (activeTab === 'clients') {
+        return <ClientForm initialData={editingClient} onSuccess={() => { fetchData(); setMode('list'); }} onCancel={() => setMode('list')} isAdmin={true} />;
+    }
+    if (activeTab === 'trips') {
+        return <TripForm initialData={editingTrip} availableClients={clients} onSuccess={() => { fetchData(); setMode('list'); }} onCancel={() => setMode('list')} />;
+    }
+    if (activeTab === 'air') {
+        return <AirGroupForm initialData={editingAirGroup} availableClients={clients} onSuccess={() => { fetchData(); setMode('list'); }} onCancel={() => setMode('list')} />;
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-10">
+      {/* Navbar */}
+      <nav className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between h-16">
+                <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 flex items-center">
+                       {/* Logo or Title */}
+                       <span className="text-xl font-bold text-gray-800">Painel Administrativo</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <button onClick={fetchData} className="p-2 text-gray-400 hover:text-primary transition-colors" title="Atualizar Dados">
+                        <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                    </button>
+                    <button onClick={handleLogout} className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-100">
+                        Sair
+                    </button>
+                </div>
+            </div>
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Navigation Tabs */}
+        <div className="flex space-x-1 bg-gray-200 p-1 rounded-lg mb-6 overflow-x-auto">
+            <button onClick={() => setActiveTab('clients')} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${activeTab === 'clients' ? 'bg-white text-primary shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                <div className="flex items-center justify-center gap-2"><Users size={16}/> Clientes</div>
+            </button>
+            <button onClick={() => setActiveTab('trips')} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${activeTab === 'trips' ? 'bg-white text-primary shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                <div className="flex items-center justify-center gap-2"><Map size={16}/> Viagens</div>
+            </button>
+            <button onClick={() => setActiveTab('air')} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${activeTab === 'air' ? 'bg-white text-primary shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                <div className="flex items-center justify-center gap-2"><Plane size={16}/> Grupos Aéreos</div>
+            </button>
+            <button onClick={() => setActiveTab('reports')} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${activeTab === 'reports' ? 'bg-white text-primary shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                <div className="flex items-center justify-center gap-2"><FileText size={16}/> Relatórios</div>
+            </button>
+            <button onClick={() => setActiveTab('hotels')} className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${activeTab === 'hotels' ? 'bg-white text-primary shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                <div className="flex items-center justify-center gap-2"><Bed size={16}/> Hotéis</div>
+            </button>
+        </div>
+
+        {/* Search Bar & Add Button */}
+        {(activeTab === 'clients' || activeTab === 'trips' || activeTab === 'air') && (
+            <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+                <div className="relative flex-1">
+                    <input
+                        type="text"
+                        placeholder={
+                            activeTab === 'clients' ? "Buscar por nome ou CPF..." :
+                            activeTab === 'trips' ? "Buscar viagem..." : "Buscar grupo aéreo..."
+                        }
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <Search className="absolute left-3 top-2.5 text-gray-400" size={20} />
+                </div>
+                <button 
+                    onClick={() => {
+                        if (activeTab === 'clients') { setEditingClient(null); setMode('form'); }
+                        if (activeTab === 'trips') { setEditingTrip(null); setMode('form'); }
+                        if (activeTab === 'air') { setEditingAirGroup(null); setMode('form'); }
+                    }}
+                    className="bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm"
+                >
+                    <Plus size={20} />
+                    {activeTab === 'clients' ? 'Novo Cliente' : activeTab === 'trips' ? 'Nova Viagem' : 'Novo Grupo Aéreo'}
+                </button>
+            </div>
+        )}
+
+        {/* Loading / Error */}
+        {loading && <div className="text-center py-10"><RefreshCw className="animate-spin mx-auto text-primary mb-2" />Carregando dados...</div>}
+        {fetchError && <div className="bg-red-50 text-red-700 p-4 rounded-md mb-6 border border-red-200 flex items-center gap-2"><AlertCircle size={20}/>{fetchError}</div>}
+
+        {/* LISTS */}
+        {!loading && !fetchError && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                
+                {/* --- CLIENTS LIST --- */}
+                {activeTab === 'clients' && (
+                    <div className="divide-y divide-gray-100">
+                        {currentItems.length === 0 ? <div className="p-8 text-center text-gray-500">Nenhum cliente encontrado.</div> : 
+                        (currentItems as Client[]).map(client => (
+                            <div key={client.id} className="p-4 hover:bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold">
+                                        {client.nome.charAt(0)}{client.sobrenome.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-800">{client.nome} {client.sobrenome}</h3>
+                                        <div className="text-sm text-gray-500 flex gap-4">
+                                            <span>CPF: {client.cpf}</span>
+                                            <span>{client.cidade}/{client.estado}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleEditClient(client)} className="text-gray-400 hover:text-primary p-2 transition-colors"><Pencil size={18}/></button>
+                                    <button onClick={() => handleDeleteClient(client.id)} className="text-gray-400 hover:text-red-600 p-2 transition-colors"><Trash2 size={18}/></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* --- TRIPS LIST --- */}
+                {activeTab === 'trips' && (
+                    <div className="divide-y divide-gray-100">
+                         {currentItems.length === 0 ? <div className="p-8 text-center text-gray-500">Nenhuma viagem encontrada.</div> : 
+                        (currentItems as Trip[]).map(trip => (
+                            <div key={trip.id} className="p-4 hover:bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                                <div>
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                        <MapPin size={16} className="text-primary" /> {trip.nome_viagem}
+                                    </h3>
+                                    <div className="text-sm text-gray-500 mt-1 flex gap-3">
+                                        <span>{formatDateDisplay(trip.data_ida)} ➜ {formatDateDisplay(trip.data_volta)}</span>
+                                        <span>• {trip.destino}</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <button onClick={() => handleGenerateContract(trip)} className="px-3 py-1 text-xs border border-blue-200 text-blue-600 bg-blue-50 rounded hover:bg-blue-100 flex items-center gap-1">
+                                        <FileSignature size={14} /> Contrato
+                                    </button>
+                                    <button onClick={() => handleEditTrip(trip)} className="text-gray-400 hover:text-primary p-2"><Pencil size={18}/></button>
+                                    <button onClick={() => handleDeleteTrip(trip.id)} className="text-gray-400 hover:text-red-600 p-2"><Trash2 size={18}/></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* --- AIR GROUPS LIST --- */}
+                {activeTab === 'air' && (
+                    <div className="divide-y divide-gray-100">
+                         {currentItems.length === 0 ? <div className="p-8 text-center text-gray-500">Nenhum grupo encontrado.</div> : 
+                        (currentItems as AirGroup[]).map(group => (
+                            <div key={group.id} className="p-4 hover:bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                                <div>
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                        <Plane size={16} className="text-primary" /> {group.nome_grupo}
+                                    </h3>
+                                    <div className="text-sm text-gray-500 mt-1 flex gap-3">
+                                        <span>{group.origem || 'Origem'} ✈ {group.destino || 'Destino'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <button onClick={() => handlePrintAirList(group)} className="px-3 py-1 text-xs border border-green-200 text-green-700 bg-green-50 rounded hover:bg-green-100 flex items-center gap-1">
+                                        <Printer size={14} /> Lista Aérea
+                                    </button>
+                                    
+                                    {/* NEW BUTTON */}
+                                    <button 
+                                        onClick={() => alert("Funcionalidade em desenvolvimento: Autorização de Débito")}
+                                        className="px-3 py-1 text-xs border border-blue-200 text-blue-700 bg-blue-50 rounded hover:bg-blue-100 flex items-center gap-1"
+                                    >
+                                        <CreditCard size={14} /> Autorização de Débito
+                                    </button>
+
+                                    <button onClick={() => handleEditAirGroup(group)} className="text-gray-400 hover:text-primary p-2"><Pencil size={18}/></button>
+                                    <button onClick={() => handleDeleteAirGroup(group.id)} className="text-gray-400 hover:text-red-600 p-2"><Trash2 size={18}/></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                
+                {/* --- REPORTS TAB --- */}
+                {activeTab === 'reports' && (
+                    <div className="p-4">
+                        <ReportsTab />
+                    </div>
+                )}
+
+                {/* --- HOTELS TAB --- */}
+                {activeTab === 'hotels' && (
+                    <div className="p-4">
+                        <HotelsTab />
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && filteredItems.length > ITEMS_PER_PAGE && activeTab !== 'reports' && activeTab !== 'hotels' && (
+            <div className="flex justify-center mt-6 gap-2">
+                <button 
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-md border border-gray-300 bg-white disabled:opacity-50"
+                >
+                    <ChevronLeft size={20} />
+                </button>
+                <span className="px-4 py-2 text-sm text-gray-600 flex items-center">
+                    Página {currentPage} de {totalPages}
+                </span>
+                <button 
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-md border border-gray-300 bg-white disabled:opacity-50"
+                >
+                    <ChevronRight size={20} />
+                </button>
+            </div>
+        )}
+
+      </main>
+    </div>
+  );
+};
+
+export default AdminDashboard;
