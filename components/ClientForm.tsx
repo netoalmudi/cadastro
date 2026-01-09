@@ -3,7 +3,7 @@ import SectionHeader from './ui/SectionHeader';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import SignaturePad from './SignaturePad';
-import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle, ArrowLeft, Eye, CreditCard } from 'lucide-react';
+import { Camera, Upload, CheckCircle, Loader2, AlertTriangle, XCircle, ArrowLeft, Eye, CreditCard, Trash2 } from 'lucide-react';
 import { compressImage } from '../utils/imageUtils';
 import { supabase, isSupabaseConfigured, configError } from '../db/database';
 import { Client, ClientFormData } from '../types';
@@ -45,6 +45,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
   // Estado para controlar a re-renderização do SignaturePad ao limpar
   const [signatureKey, setSignatureKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   
   // Tipos de arquivo suportados
   type FileFieldType = 'arquivoRg' | 'arquivoPassaporte' | 'arquivoCartaoFrente' | 'arquivoCartaoVerso';
@@ -288,7 +289,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
   };
 
   const handleSignature = (sig: string | null) => {
-    setFormData(prev => ({ ...prev, assinatura: sig }));
+    setFormData(prev => ({ ...prev, signature: sig }));
   };
 
   const resetForm = () => {
@@ -303,6 +304,65 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
   const handleClear = () => {
     if (window.confirm("Tem certeza que deseja limpar todos os campos do formulário?")) {
       resetForm();
+    }
+  };
+
+  // Função para deletar arquivo do storage e limpar campo no DB
+  const handleDeleteExistingFile = async (fieldName: FileFieldType) => {
+    if (!initialData?.id || !supabase) return;
+    
+    const dbField = fieldName === 'arquivoRg' ? 'rg_url' : 
+                   fieldName === 'arquivoPassaporte' ? 'passaporte_url' : 
+                   fieldName === 'arquivoCartaoFrente' ? 'cartao_credito_frente_url' : 
+                   'cartao_credito_verso_url';
+    
+    const url = initialData[dbField as keyof Client] as string;
+    if (!url) return;
+
+    if (!window.confirm("Deseja realmente excluir este arquivo permanentemente? Esta ação não pode ser desfeita.")) {
+      return;
+    }
+
+    setIsDeleting(fieldName);
+
+    try {
+      // Extrai o path do arquivo da URL do Supabase
+      // URL format: https://[project].supabase.co/storage/v1/object/public/[bucket]/[folder]/[filename]
+      const urlParts = url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      const folder = urlParts[urlParts.length - 2];
+      const filePath = `${folder}/${fileName}`;
+
+      // 1. Remover do Storage
+      const { error: storageError } = await supabase.storage
+        .from('documentos-clientes')
+        .remove([filePath]);
+
+      if (storageError) throw storageError;
+
+      // 2. Atualizar o registro no Banco de Dados
+      const { error: dbError } = await supabase
+        .from('clientes')
+        .update({ [dbField]: null })
+        .eq('id', initialData.id);
+
+      if (dbError) throw dbError;
+
+      alert("Arquivo excluído com sucesso!");
+      
+      // Atualizar estado local
+      setFormData(prev => ({ ...prev, [dbField]: null }));
+      
+      // Se tiver sucesso, removemos o initialData da memória para o campo sumir
+      if (initialData) {
+          (initialData as any)[dbField] = null;
+      }
+
+    } catch (error: any) {
+      console.error("Erro ao excluir arquivo:", error);
+      alert("Erro ao excluir arquivo: " + error.message);
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -386,7 +446,6 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
       }
 
       // Revalidação final de duplicidade (segurança extra contra race conditions)
-      // ... (código existente de verificação mantido abaixo, apenas por segurança)
       let cpfQuery = supabase
         .from('clientes')
         .select('id', { count: 'exact', head: true })
@@ -404,8 +463,6 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         alert("Este CPF já consta em nosso banco de dados.\n\nPara alterações ou dúvidas, entre em contato com o número (41) 99813-6567 - Neto Almudi.");
         return;
       }
-      
-      // ... Resto do código de upload e salvamento
       
       let rgUrl = initialData?.rg_url || null;
       let passaporteUrl = initialData?.passaporte_url || null;
@@ -492,13 +549,14 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
   ) => {
     const file = formData[fieldName];
     const isProcessing = processingFile === fieldName;
+    const deletingThis = isDeleting === fieldName;
     const hasExisting = !!existingUrl;
 
     return (
       <div className="flex flex-col gap-3 w-full sm:w-auto p-4 border border-gray-200 rounded-lg bg-gray-50 shadow-sm flex-1">
         <div className="flex justify-between items-start">
             <span className="text-sm font-bold text-gray-700">{label}</span>
-            {isProcessing ? (
+            {isProcessing || deletingThis ? (
                 <Loader2 className="w-4 h-4 text-primary animate-spin" />
             ) : file ? (
                 <CheckCircle className="w-5 h-5 text-green-500" />
@@ -513,6 +571,8 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         <div className="text-xs mb-1 h-5">
              {isProcessing ? (
                 <span className="text-blue-600">Processando imagem...</span>
+             ) : deletingThis ? (
+                <span className="text-red-600">Excluindo do servidor...</span>
              ) : file ? (
                 <span className="text-green-600 font-medium">Foto selecionada pronta para envio.</span>
              ) : hasExisting ? (
@@ -524,7 +584,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
 
         <div className="flex gap-2">
             {/* BOTÃO CÂMERA (Mobile Friendly) */}
-            <label className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg cursor-pointer transition border border-blue-200 bg-blue-100 text-blue-900 hover:bg-blue-200 active:scale-95 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+            <label className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg cursor-pointer transition border border-blue-200 bg-blue-100 text-blue-900 hover:bg-blue-200 active:scale-95 ${isProcessing || deletingThis ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Camera size={24} className="mb-1" />
                 <span className="text-xs font-bold">Tirar Foto</span>
                 <input 
@@ -534,12 +594,12 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
                     className="hidden" 
                     onChange={(e) => handleFileChange(e, fieldName)} 
                     onClick={(e) => (e.target as HTMLInputElement).value = ''}
-                    disabled={!!processingFile}
+                    disabled={!!processingFile || deletingThis}
                 />
             </label>
 
             {/* BOTÃO GALERIA / ARQUIVO */}
-            <label className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg cursor-pointer transition border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:scale-95 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+            <label className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg cursor-pointer transition border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:scale-95 ${isProcessing || deletingThis ? 'opacity-50 pointer-events-none' : ''}`}>
                 <Upload size={24} className="mb-1" />
                 <span className="text-xs font-bold">Galeria/PDF</span>
                 <input 
@@ -548,20 +608,33 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
                     className="hidden" 
                     onChange={(e) => handleFileChange(e, fieldName)} 
                     onClick={(e) => (e.target as HTMLInputElement).value = ''}
-                    disabled={!!processingFile}
+                    disabled={!!processingFile || deletingThis}
                 />
             </label>
         </div>
 
         {existingUrl && (
-            <a 
-              href={existingUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-xs text-center text-primary hover:text-blue-800 transition-colors mt-1 flex items-center justify-center gap-1 py-1 hover:bg-blue-50 rounded"
-            >
-              <Eye size={12} /> Visualizar documento atual
-            </a>
+            <div className="flex flex-col gap-1 mt-1">
+                <a 
+                  href={existingUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-center text-primary hover:text-blue-800 transition-colors flex items-center justify-center gap-1 py-1 hover:bg-blue-50 rounded"
+                >
+                  <Eye size={12} /> Visualizar documento atual
+                </a>
+                
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteExistingFile(fieldName)}
+                    disabled={deletingThis}
+                    className="text-xs text-center text-red-600 hover:text-red-800 transition-colors flex items-center justify-center gap-1 py-1 hover:bg-red-50 rounded"
+                  >
+                    <Trash2 size={12} /> Excluir permanentemente
+                  </button>
+                )}
+            </div>
         )}
       </div>
     );
@@ -586,13 +659,11 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
         
         {/* LOGO E TÍTULOS - Layout Flex para alinhar Logo + Texto */}
         <div className="flex flex-col md:flex-row items-center gap-5">
-            {/* Imagem da Logo - Espera arquivo logo.png na pasta public */}
             <img 
               src="/logo.png" 
               alt="Logo Neto Almudi" 
               className="h-20 w-auto object-contain"
               onError={(e) => {
-                 // Oculta a imagem se o arquivo não existir (fallback silencioso)
                  e.currentTarget.style.display = 'none';
               }} 
             />
@@ -620,7 +691,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initialData, onSuccess, onCance
           <div>
             <p className="font-bold">Erro de Configuração</p>
             <p className="text-sm">{configError}</p>
-            <p className="text-xs mt-1 text-red-600">Verifique o arquivo <code>.env</code> na raiz do projeto.</p>
+            <p className="text-xs mt-1 text-red-600">Verifique as credenciais no banco de dados.</p>
           </div>
         </div>
       )}
